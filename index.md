@@ -1,3 +1,3 @@
 Sebastian Deri
-Phd Student Cornell
+Phd Student @ Cornell
 
