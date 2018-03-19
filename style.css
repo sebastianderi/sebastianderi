@@ -51,3 +51,7 @@ pre {
 	line-height: 18.5714px;
 	color: white;
 }
+
+a:visited {
+	color: #ADD8E6;
+}
