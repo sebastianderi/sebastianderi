@@ -1,5 +1,15 @@
 body {
-	background-color: black; 
+	background-color: black;
+}
+
+div {
+    margin-left: auto;
+		margin-right: auto;
+		margin-top: 5%;
+    width: 600px;
+    /* border: 3px solid white; */
+    padding: 10px;
+		text-align:center;
 }
 
 h1 {
@@ -10,7 +20,7 @@ h1 {
 	font-weight: 500;
 	line-height: 26.4px;
 	text-align: center;
-	padding-top: 50px;
+	/* padding-top: 50px; */
 	color: white;
 }
 h3 {
