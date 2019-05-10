@@ -26,6 +26,7 @@ library(caret) # modeling
 library(AppliedPredictiveModeling)
 library(e1071) # has skewness() function
 library(DescTools) # has Winsorize() function
+library(ggcorrplot) # for correlation plot
 ```
 
 # Load Data
@@ -57,7 +58,7 @@ a super useful and universal theme in data management: Join (SQL), 2018.)
 
 ```{r}
 # join all features with ground truth, by stat_id
-stats_all <-
+stats_raw <-
   join_all(dfs = list(stats_length,
                       stats_pos,
                       stats_sent,
@@ -75,7 +76,7 @@ stats_all <-
 
 
 # print joined df
-stats_all
+stats_raw
 
 ```
 
@@ -112,7 +113,7 @@ for prediction. Let's go about adjusting our data a bit to account for this.
 
 
 ```{r hists, fig.width = 10, fig.height=26}
-stats_all %>%
+stats_raw %>%
   select(-stat_id) %>%
   keep(is.numeric) %>% 
   gather(key = "variable",
@@ -131,9 +132,10 @@ stats_all %>%
     scale_fill_discrete(breaks=c("length", "part_of_speech", "complexity",
                                  "sentiment", "word")) +
     theme(legend.position="top")
+
 ```
 
-## Skew (Adjusting)
+## Skew
 
 Kuhn & Johnson, (2013) suggest a fair number of popular ways of dealing with 
 skewed data. One common solution is to apply different types of transformations
@@ -157,80 +159,249 @@ the 5th percentile are transformed into whatever the 5th percentile value is, an
 any values above the 95th percentile value are transformed into whatever the 95 percentile
 value is). This method is called Winsorizing (Winsorizing, 2019).
 
+## Skew (Winsorizing Example)
 
 Let me demonstrate what the this look like on one variable, which appears highly
 skewed (the "n_words" count, referenced earlier). Visualized below are the raw
-distribution and the winsorized distribution.
-
+distribution and the winsorized distribution (windsorized at 1% and 99%). As we can
+see, this massively reduces the skew in the distribution.
 
 ```{r}
+# make data frame to store columns for raw and winsorized "n_words" column
+winsor_exmpl <- as.data.frame(stats_raw$n_words)
+winsor_exmpl <- winsor_exmpl %>% dplyr::rename(n_words_raw = 1)
 
-stats_all$n_words2 <- 
-  Winsorize(stats_all$n_words,
+# winsorize the variables (at 1% and 99%)
+winsor_exmpl$n_words_winsorized <- 
+  Winsorize(stats_raw$n_words,
             probs = c(0.01, 0.99))
 
-stats_all %>%
-  select(n_words,
-         n_words2) %>%
-  gather() %>% 
-  ggplot(aes(value)) +
-    facet_wrap(~ key, scales = "free") +
+# visually compare raw and winsorized distributions
+winsor_exmpl %>%
+  select(n_words_raw,
+         n_words_winsorized) %>%
+  gather(key = "transform",
+         value = "value") %>% 
+  ggplot(aes(x = value)) +
+    facet_wrap(~ transform,
+               scales = "free") +
     geom_histogram()
 ```
 
+## Skew (Winsorizing Across All Variables)
 
-To apply this transformation, we have to have some method for deciding which 
+To apply this transformation across all variables, we have to have some method for deciding which 
 variables are skewed enough that they warrant winsorization. We could 
-decide this based on visual inspection of the individual histograms above and
-personal judgment. However, there are a lot of these. And there exist other 
-metrics for quantifying skew -- kurtosis, skew, and other rules of thumb (e.g.
+decide this based on visual inspection of the individual histograms above using
+personal judgment. However, that is a lot of data to look through one by one.
+And there exist metrics for quantifying skew, which we can leverage here -- 
+kurtosis, skew, and other rules of thumb (e.g.
 the ratio between the max and min value for a variable should be no more than 20)
 (Kuhn & Johnson, 2013, Chapter 3). I am going to simply choose the metric called
 "skewness" (there's no obvious reason why one metric is better than another).
 The formula for this metric is shown below, and some rules of thumb suggest that
 we should worry about distributions with skewness values greater than 2. So, we'll
-winsorize all variables that have a skewness greater than 2.
+winsorize all variables that have a skewness with an absolute value greater than 2.
 
-![](.pics/kuhn_p31_skew.PNG)
+![](./pics/kuhn_p31_skew.PNG)
 
 
 ```{r}
-skewness(stats_all$pos_INTJ)
+# make new data frame to store cleaned data
+stats_proc <- stats_raw 
 
-as.data.frame(
-  lapply(subset(stats_all, select = -c(stat_id, grd_truth)),
-         e1071::skewness)) %>%
-  gather(key = "feature",
-         value = "skew") %>%
-  arrange(desc(skew))
+# find skew of each variable
+allvar_skewness <-
+  as.data.frame(
+    lapply(subset(stats_raw, select = -c(stat_id, grd_truth)),
+           e1071::skewness)) %>%
+    gather(key = "feature",
+           value = "skew") %>%
+    arrange(desc(skew))
+
+# print variables in order of skewness
+allvar_skewness
+
+# make df with names and skew of features that have absolute skew value of more than 2
+too_skewed <-
+  allvar_skewness %>%
+  filter(abs(skew) > 2)
+
+# update cleaned doc (too skewed columns, replaces with winsorized columns)
+stats_proc[, names(stats_proc) %in% c(too_skewed$feature, "wrd_I'M")] <- 
+# for some reason the column "wrd_I'M" gets left out (can check with setdiff()),
+# so I just put it back manually (for some reason gets converted to "wrd_I.M" by too_skewed$feature)
+# check with: setdiff(too_skewed$feature, names(stats_proc[, names(stats_proc) %in% too_skewed$feature]))
+  as.data.frame(
+    lapply(stats_proc[, names(stats_proc) %in% c(too_skewed$feature, "wrd_I'M")],
+           Winsorize))
 ```
 
-## Zero or Near Zero Variance
+## Skew (Visualize All Variables, Now Winsorized)
+
+Let's take a look at our results. That is, let's look at all the distributions again,
+with our now winsorized variables. From looking at these distributions, we see that
+the situation is improved from before, but certainly not perfect. Let's move on to
+our next problem.
+
+```{r hists, fig.width = 10, fig.height=26}
+stats_proc %>%
+  select(-stat_id) %>%
+  keep(is.numeric) %>% 
+  gather(key = "variable",
+         value = "value") %>%
+  mutate(feature_type = case_when(grepl("^n_", variable) ~ "length",
+                                  grepl("^pos_", variable) ~ "part_of_speech",
+                                  grepl("^sent_", variable) ~ "sentiment",
+                                  grepl("^read_", variable) ~ "complexity",
+                                  grepl("^wrd_", variable) ~ "word")) %>%
+  ggplot(aes(x = value,
+             fill = feature_type)) +
+    facet_wrap(~ variable,
+               ncol = 7,
+               scales = "free") +
+    geom_histogram() +
+    scale_fill_discrete(breaks=c("length", "part_of_speech", "complexity",
+                                 "sentiment", "word")) +
+    theme(legend.position="top")
+
+```
+
+
+
+## Zero or Near Zero Variance (Identify)
 
 Another type of issue in our data we might want to deal with is those variables
-that exhibit zero or near zear variances (with almost all data points clustered at
-one value). The caret package has a built in function, nearZeroVar, which helps
+that exhibit zero or near zear variances -- that is, almost all data points take on
+one value. The caret package has a built in function, nearZeroVar, which helps
 us automatically identify such variables. (It does this by identifying variables
-where either all values are the same, or the ratio of the first most frequent 
-value to the second most frequent value is beyong some specified threshold).
+where either literally 100% of the values are the same or the ratio of the number of 
+occurrences of the first most frequent to the number of occurrences of the 
+second most frequent value is beyong some specified threshold; the default,
+I believe is 95/5. But I will adjust this to be an even more liberal 90/10).
 
+As we can see below, this highlights 30 variables for deletion -- e.g. "pos_PROPN", 
+in which literally
+all the values are the same, or "wrd_SHE" and "wrd_HE" where the ratio of the
+first to second most common value of well over 90/10 (i.e. 9.0); other features like "wrd_I"
+are much more balance, with a frequency ratio of 1.06).
 
 
 ```{r}
-nearZeroVar(stats_all,
-            saveMetrics = TRUE) %>%
-  arrange(freqRatio)
+# create object that stores near zero variance stats
+features_nzv <-
+  nearZeroVar(stats_proc %>% select(-stat_id, -grd_truth),
+              saveMetrics = TRUE,
+              freqCut = 90/10,
+              name = TRUE) %>%
+  rownames_to_column(var = "feature")
+
+# display sorted object
+features_nzv %>%
+  arrange(desc(zeroVar), desc(nzv), desc(freqRatio), percentUnique)
 ```
 
+## Zero or Near Zero Variance (Eliminate)
+
+Let's now actually eliminate these 30 zero or near zero variance features, from
+our set of cleaned features.
+
+```{r}
+# first, make df with names of features (and other nzv stats) to delete
+nzv_delete <- 
+  features_nzv %>%
+  filter(zeroVar == TRUE | nzv == TRUE)
+
+# now remove identified columns for data frame
+stats_proc <-
+  stats_proc[, !(names(stats_proc) %in% nzv_delete$feature)]
+```
+
+
+## Zero or Near Zero Variance (Visualize Remaining)
+
+Again, let's check what we are left with. As we can see, we still have some
+predictors with pretty unequal bins. But at least our worst offenders have been
+removed.
+
+```{r hists, fig.width = 10, fig.height=26}
+stats_proc %>%
+  select(-stat_id) %>%
+  keep(is.numeric) %>% 
+  gather(key = "variable",
+         value = "value") %>%
+  mutate(feature_type = case_when(grepl("^n_", variable) ~ "length",
+                                  grepl("^pos_", variable) ~ "part_of_speech",
+                                  grepl("^sent_", variable) ~ "sentiment",
+                                  grepl("^read_", variable) ~ "complexity",
+                                  grepl("^wrd_", variable) ~ "word")) %>%
+  ggplot(aes(x = value,
+             fill = feature_type)) +
+    facet_wrap(~ variable,
+               ncol = 7,
+               scales = "free") +
+    geom_histogram() +
+    scale_fill_discrete(breaks=c("length", "part_of_speech", "complexity",
+                                 "sentiment", "word")) +
+    theme(legend.position="top")
+
+```
+
+## Collinearity
+
+A final problem that that affects some models (like logistic regression) is collinearity. 
+A high degree of correlation between our variables may lead to unstable and unreliable
+estimates. We already know this will be a problem among at least two of our variables
+(the two complexity measures,flesch-kincaid and gunning fog scores, which have an 
+absolute pearson correlation coefficient value greater than 0.94). Classic regression
+statistics like variance inflation factors can be used to identify problems of 
+collinearity. However, Kuhn & Johnson point out that such statistics are often
+less useful outside the linear regression cases. They suggest another another algorithm 
+for diagnosing and eliminating problems of collinearity (2013, p. 47), which is 
+intuitive and is useful for more cases. We simply pick a correlation threshold 
+(say |r| = 0.75). We then examine the correlation matrix of all the predictors.
+We then examine if any predictors have a correlation with an absolute value higher
+then our threshold. If they do, then we compute the average absolute correlation coefficient
+value of each of those two variables have with the rest of the predictors, and we eliminate
+the one with the higher average absolute correlation coefficient. We continue this
+process until there are no pairwise correlations above our threshold. (Note however,
+that this method only resolves issues of collinearity in two dimensions.)
 
 ## Collinearity (Visualizing)
 
-A problem that might affect models like logistic regression is collinearity. A
-high degree of correlation between our variables may lead to unstable and unreliable
-estimates. Kuhn & Johnson, (2013, p. ) suggest an algorithm for diagnosing and 
-eliminating problems of collinearity.
+Let's start by simply visualizing all pairwise (96 x 96) correlations between our
+remaining pre-processed variables. We can notice a few things from this figure.
+Features seem to have higher correlations within their own type then outside their
+own type (e.g. look along the red diaganol and notice there are dark sets of boxes
+eminating out; these are clusters of similar variable types -- e.g. all the parts of 
+speech, form the second biggest such box in the bottom left ("pos_ADJ", "pos_ADP", ...),
+followed by a smaller box for the three sentiment metrics ("sent_POS", "sent_NEG", 
+"sent_NET", followed by 
+an even smaller box for the readability features ("read_FLESCH", "read_FOG"), followed
+by the very largest box for all the individual words ("wrd_I", "wrd_AND", ...).
+As we suspected, the two readability features are highly (negatively) correlated.
+Further, we see that the statement length metrics ("n_words", "n_unique", "n_unique_prop")
 
-```{r}
+```{r, fig.width = 17, fig.height=17}
+# get correlations
+feature_cors <- cor(stats_proc %>% select(-stat_id, -grd_truth))
+feature_pcors <- ggcorrplot::cor_pmat(stats_proc %>% select(-stat_id, -grd_truth))
+
+# visualize all pairwise correlations
+ggcorrplot(feature_cors,
+           p.mat = feature_pcors,
+           insig = "blank") + 
+  theme(legend.position = "top",
+        axis.text.x = element_text(angle = 90,
+                                   vjust = 0.1),
+        panel.grid.major.y = element_blank(),
+        panel.grid.major.x = element_blank())
+```
+
+
+## Collinearity (Eliminating)
+
+```{r, eval=FALSE}
 # select only predictor variables (i.e. get rid of stat_id and grd_truth columns)
 stats_allclean_x <- subset(stats_allclean,
                            select = -c(stat_id, grd_truth))
@@ -268,7 +439,7 @@ mean the same thing -- that value is 0.5 standard deviations above the mean for
 that feature. Luckily, the preProcess function in the caret package (Kuhn, 2008) 
 makes this extremely easy.
 
-```{r}
+```{r, eval=FALSE}
 # center and scale with preProcess and predict from caret
 stats_allclean <- 
   predict(newdata = stats_all,
@@ -285,11 +456,11 @@ stats_allclean
 
 # Save
 
-```{r}
+```{r, eval=FALSE}
 # save the raw and various cleaned data objects
-save(stats_all,
-     stats_allclean,
-     file = "stats_all.Rda")
+save(stats_raw,
+     stats_proc,
+     file = "stats_proc.Rda")
 
 ```
 
