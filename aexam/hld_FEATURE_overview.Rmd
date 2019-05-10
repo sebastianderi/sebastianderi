@@ -1,0 +1,137 @@
+---
+title: "Feature Extraction (Overview & Preliminaries)"
+output:
+  html_document:
+    df_print: paged
+    code_folding: show
+---
+
+[return to [overview page](./hld_OVERVIEW.html)]
+
+# Overview
+
+There is a long history of trying to find cues to deception (Bunn, 2012). 
+For example, psychologists like Paul Ekman (2009) have tried to identify 
+sublte nonverbal emotional and behavioral cues (e.g. facial "micro-expressions") 
+which may reveal liars. Perhaps most notoriously, polygraph tests have been 
+claimed to provide insight into whether a peson is lying by examining changes 
+in various physiological states -- pulse rate, respiration, skin conductivity,
+and so on (National Research Council, 2003; Polygraph, 2019). More recently, 
+claims have emerged that functional magnetic resonance imaging can be used to 
+detect lies, by examining differences in blood oxygen levels to various brain areas
+(Simpson, 2008; Lie detection, 2019). Yet another method of analysis that falls
+in this tradition is the analysis of text to suss out truths from lies (Newman, 
+Pennebaker, Berry, & Richards, 2003; Pennebaker, Mehl, & Niederhoffer, 2003;
+Pérez-Rosas & Mihalcea, 2015). In research of this type, the cues used to detect 
+lies are features extracted from text -- for example: parts of speech, the 
+sentiment of words, and the linguistic complexity of sentences. My analysis
+will be of this sort, Thus, the next few sections will be devoted to extracting
+various textual features that my prove useful for lie detection.
+
+# Preliminaries
+
+In this rest of this page, I will just get some basic prelimary 
+housekeeping matters in order that will make the extraction of features 
+in the following sections easier. (Feel free to skip over this, not much happens.)
+
+## Preliminaries: Packages
+
+Again, I will start by loading relevant packages.
+
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse) # cleaning and visualization
+library(quanteda) # text analysis
+```
+
+## Preliminaries: Data
+
+Again, since this is a new analysis, I must load in the data that will be
+analyzed. These will be exactly the raw statement previewed in the 
+["Data Overview"](./hld_DATAOVERVIEW.html).
+
+```{r, message=FALSE, warning=FALSE}
+# First, load in the statements
+stats_raw <- read.csv(file = "statements_final.csv")
+
+```
+
+## Preliminaries: Basic transformations and cleaning
+
+First, we are going to convert all the statements to lower case (to ensure
+that words like "I" and "i" are treated as the same word).
+
+```{r}
+# create new object to store cleaned data
+stats_clean <- stats_raw
+
+# Convert all text in statements to character
+stats_clean$statement <- as.character(stats_clean$statement)
+
+# Check that this was done correctly
+mode(stats_clean$statement)
+
+# Now convert all these statements to lower case
+stats_clean$statement <- char_tolower(stats_clean$statement)
+
+```
+
+Now I will preview a random subset of statements, just to check that they look like
+what I want.
+
+```{r}
+stats_clean %>%
+  sample_n(5) %>%
+  select(statement,
+         everything())
+```
+
+
+## Save output
+
+And now we can save the cleaned output (as an R data object), for future import
+and use subsequent analyses.
+
+
+```{r}
+# save file
+save(stats_clean,
+     file = "stats_clean.Rda")
+
+# now remove stats_clean from global environment (to avoid later confusion)
+rm(stats_clean)
+
+```
+
+# Citations
+
+* Bunn, G. C. (2012). The truth machine: A social history of the lie detector. 
+Johns Hopkins University Press.
+
+* Ekman, P. (2009). Telling lies: Clues to deceit in the marketplace,
+politics, and marriage (revised edition). WW Norton & Company.
+
+* Lie detection. (2019). In Wikipedia. Retrieved from 
+https://en.wikipedia.org/w/index.php?title=Lie_detection&oldid=887268550
+ 
+* National Research Council. (2003). The polygraph and lie detection. 
+National Academies Press.
+
+* Newman, M. L., Pennebaker, J. W., Berry, D. S., & Richards, J. M. (2003).
+Lying words: Predicting deception from linguistic styles. Personality and 
+social psychology bulletin, 29(5), 665-675.
+
+* Pennebaker, J. W., Mehl, M. R., & Niederhoffer, K. G. (2003). 
+Psychological aspects of natural language use: Our words, our selves.
+Annual Review of Psychology, 54(1), 547-577.
+
+* Pérez-Rosas, V., & Mihalcea, R. (2015). Experiments in open domain deception 
+detection. Proceedings of the 2015 Conference on Empirical Methods in Natural 
+Language Processing, 1120-1125.
+
+* Polygraph. (2019). In Wikipedia. Retrieved from
+https://en.wikipedia.org/w/index.php?title=Polygraph&oldid=895112117
+
+* Simpson, J. R. (2008). Functional MRI lie detection: too good to be true?
+Journal of the American Academy of Psychiatry and the Law Online, 36(4), 491-498.
+
+# END

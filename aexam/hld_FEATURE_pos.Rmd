@@ -1,0 +1,416 @@
+---
+title: "Feature Extraction (Parts of Speech)"
+output:
+  html_document:
+    df_print: paged
+    code_folding: show
+---
+
+[return to [overview page](./hld_OVERVIEW.html)]
+
+Now we are going to extract another set of features from each statement. This
+will be the frequency with which various parts of speech occur. James Pennebaker
+makes the case that particles of speech can offer insight into people's 
+psychological states and dispositions. In a review, he and his coauthors argue that
+"particles-parts of speech that include pronouns, articles, prepositions, conjunctives,
+and auxiliary verbs" are of particular "psychological value" (Pennebaker, Mehl, & 
+Niederhoffer (2003). They cite, 
+for example, various studies which suggest that depression and suicidal 
+ideation are associated with greater use of self-referencing pronouns 
+(Bucci & Freedman, 1981; Stirman & Pennebaker, 2001). 
+The title of Pennebaker's (2011) popular book on the topic is 
+also telling, with regard to the particular insight he believes that 
+certain parts of speech might offer -- *The Secret Life of Pronouns: What Our
+Words Say about Us*. 
+
+And what seems to apply to psychological states in general, also appears to apply
+in the domain of lie detection as well. Newman, Pennebaker, Berry, & Richards 
+(2003), for example, find evidence that, when people are lying, they tend to use fewer 
+first person singular pronouns (e.g. I, me) -- perhaps in attempt to distance 
+themselves from the deceit and ownership of the dishonest act, the authors argue.
+(See Table 4 from their analyses, reproduced below.) 
+Thus, in this section, the focus will be on extracting  various parts of speech 
+from our corpus of statements. Similarly, Pérez-Rosas  & Mihalcea (2015) find 
+that parts of speech offer unique predictive value on a set of textual lies 
+and truths they collected.
+
+
+![](./pics/newman_first_pronoun_table4.png)
+
+
+
+# Packages
+
+Again, I will start by loading relevant packages.
+
+```{r, eval=FALSE}
+# for rendering: eval=FALSE
+library(tidyverse) # cleaning and visualization
+library(quanteda) # text analysis
+library(spacyr) # R wrapper for spaCy python package (used to extract parts of speech)
+# thus, must have python installed for this package to actually work
+# when using for first time, follow install instructions here: https://github.com/quanteda/spacyr
+# remember to run RStudio as administrator, when installing; and then run:
+spacy_install()
+# I think could use this later, and not have to totally reinstall (if paths are all set right)
+# spacy_initialize(model = "en") # english language model
+```
+
+# Load Data
+
+Again, I will load the most recent version of the data files, which comes from 
+[Feature Extraction (Overview)](./hld_FEATURE_overview.html). (Note, we created 
+a more recent object, recording various length metrics for
+each statement. However, we will not be using that object right now.)
+
+```{r}
+# this loads: stats_clean (a data-frame of out cleaned statements)
+load("stats_clean.Rda")
+
+```
+
+
+# Parts of Speech
+
+I am now going to go through each of the statements, and extract counts of
+the frequencies with which various parts of speech occur (e.g. the number of
+nouns, adjectives, pronouns, etc in each sentence). Previous research by
+Newman, Pennebaker, Berry, & Richards (2003) has found parts of speech to
+be a predictive feature in lie detection.
+
+## Parts of Speech (Example)
+
+I will again introduce this by walking through an example on a single sentence.
+The spacyr package (which is really a "wrapper" for a python text processing
+package) has an incredibly useful function called spacy_parse, which goes through
+a piece of text (e.g. a sentence), word by word, and identifies various
+characteristics of those words -- including their part of speech.
+
+We will use the sentence "The graduate student ate pasta for the fourth
+night in a row" as our example sentence. First, let's create and print that
+sentence.
+
+```{r}
+# Create sentence
+example_sent <- c("The graduate student ate pasta for the fourth night in a row.")
+example_sent
+
+```
+
+### Extract Parts of Speech
+
+Now, let's run spacy_parse to extract the features from that sentence.
+As we can see, the sentence is taken apart, word by word. For each word
+in the sentence, a row is created. And then each word is mapped on to a
+part of speech. (See: in the tabular object below, the first column, "token",
+has an entry for each word, and the second column, "pos", has the part of
+speech each word has been mapped on to. So for example, we see the first
+word "The" is identified as DET, a determiner, the second word "graduate"
+is identified as a noun, and so on.)
+
+```{r}
+# Parse the sentence
+parsed_ex <- 
+  spacy_parse(x = example_sent,
+            pos = TRUE)
+
+# Print in nicer format
+data.frame(parsed_ex) %>%
+  select(token,
+         pos,
+         everything())
+
+```
+
+### Count Each Part of Speech
+
+For any given statement, we then want to count up the number of times each
+type of part of speech occurs. I do this below for the example sentence.
+As we can see, our example sentence has 1 adjective, 2 adpositions (i.e. "ADP",
+which counts prepositions, postpositions, and circumpositions), 3 determiners,
+5 nouns, and 1 punctuation mark (the period).
+
+```{r}
+# count the number of each part of speech, and put back into each row = statement format
+num_pos_ex <-
+  parsed_ex %>%
+  select(token,
+         pos) %>%
+  group_by(pos) %>%
+  summarise(n = n()) %>%
+  spread(key = pos,
+         value = n,
+         fill = 0) %>% # fill empty values with zero
+  mutate(statement = example_sent) %>%
+  select(statement,
+         everything())
+num_pos_ex
+
+
+# change the column names for the parts of speech colums, to more clearly identify them
+for (i in 2:length(names(num_pos_ex))) {
+  names(num_pos_ex)[i] <-
+    paste("pos",
+          names(num_pos_ex[i]),
+          sep = "_")
+}
+
+# print the output
+num_pos_ex
+```
+
+## Parts of Speech (Full Dataset)
+
+Now, we are going to the do the same thing for all 5004 statements.
+
+First, we are going to run through each sentence, decompose each word by word,
+and record the parts of speech that each word corresponds to.
+
+```{r long_extraction, cache=TRUE}
+# for rendering: cache = TRUE
+
+# initialize a data frame, which will have three columns:
+  # - stat_id
+  # - token
+  # - part of speech
+# and will be of the length: total num. statements * words per each statement
+
+# first, count the total number of tokens
+# (takes a minute, kind of redundant and dumb; but how I'm doing it for now)
+num_words <- nrow(spacy_parse(stats_clean$statement))
+
+# initialize that data frame
+pos_long <-
+    matrix(ncol = 3,
+           nrow = num_words)
+colnames(pos_long) <- c("stat_id", "token", "pos")
+
+# now go through each statement
+current_row = 0
+start_time <- Sys.time() # store time at start of running
+for (i in 1:nrow(stats_clean)) {
+  # parse that statement, word by word
+  stat_i <- spacy_parse(stats_clean$statement[i])
+  for (k in 1:nrow(stat_i)) {
+    current_row = current_row + 1
+    # record stat_id for each word
+    pos_long[current_row, 1] <- stats_clean$stat_id[i]
+    # record each token
+    pos_long[current_row, 2] <- stat_i$token[k]
+    # record each token's corresponding part of speech
+    pos_long[current_row, 3] <- stat_i$pos[k]
+  }
+  
+}
+total_time <- Sys.time() - start_time # store total time, just for reference
+
+# Print total time it took to run
+print("Total Run Time (as difference between start and stop)")
+print(total_time)
+
+```
+
+(This is a side note, just for myself. But, I figured out how to run a faster
+and simpler implementation. I can cut down the run time from 4.5 mins to 1.7 mins;
+that doesn't matter as much here when the data is "small". But on much larger
+corpuses, this speed up might be significant. The faster implementation is below.)
+
+```{r short_extract, cache=TRUE}
+# for rendering: cache = TRUE
+
+# The key is that spacy_parse expects a TIF-compliant corpus data frame
+# So, if I put the statemetns in a TIF-compliant object, we can parse that (and
+# still keep track of the different "documents", here stat_id)
+# TIF-compliant format is explained here: https://github.com/ropensci/tif
+
+# Step 1. Organize statements in TIF-compliant way
+test <-
+  stats_clean %>%
+  select(stat_id,
+         statement) %>%
+  rename(doc_id = stat_id,
+         text = statement)
+
+# Step 2. Parse the TIF-compliant object
+start_time2 <- Sys.time()
+spacy_parse(x = test,
+            pos = TRUE)
+total_time2 <- Sys.time() - start_time2
+
+# Print total time it took to run
+print("Total Run Time (as difference between start and stop)")
+print(total_time2)
+```
+
+### Intermediate Resultant ("Long") Object
+
+Either way we do things, we end up with a very long tabublar object, where we
+now have a row for each word, rather than each statement. We want to convert 
+that back to an tabular object, where every row is a statement, and each column 
+is a count, for the number of times each of
+the types of parts of speech occurs (e.g. for each statment, we want a column
+that counts the number of adjectives, another column that counts the number of
+pronouns, and so on for each type of part of speech). That is what I create below.
+(Critically, we can do this, because for each word, we have a column storing
+the statement to which is corresponds. So it's just a matter of re-grouping things.)
+
+First, just for exposition, here is how the output object currently looks.
+(This object has 316,272 rows: that's the total number of words and punctuation
+marks across out 5,004 statements. Although note that the interactive R Markdown
+file only prints the first thousand rows.)
+
+```{r}
+# convert to data frame, for nicer presentation, and print
+(pos_long <- data.frame(pos_long))
+```
+
+### Count Parts of Speech 
+
+Now, I am going to actually go through the process of counting the number of
+times each type of part of speech occurs in each statement, and then re-organizing
+the structure of that resultant object, converting it back into a "wide" format, 
+where each row represents a statement rather than a word. (Now, we see our data 
+object has 5,004 rows, one for each statement.)
+
+```{r}
+# convert back to wide, where each row is a statement 
+stats_pos <-
+  pos_long %>%
+  group_by(stat_id,
+           pos) %>%
+  summarise(n = n()) %>%
+  spread(key = pos,
+         value = n,
+         fill = 0) # fill empty values with zero
+
+# change the column names for the parts of speech colums, to more clearly identify them
+for (i in 2:length(names(stats_pos))) {
+  names(stats_pos)[i] <-
+    paste("pos",
+          names(stats_pos[i]),
+          sep = "_")
+}
+
+# print resulting data frame
+stats_pos
+
+```
+
+## Parts of Speech (Results)
+
+Now, let's take a peek at how the different parts of speech are distributed
+across our statements. Specifically, let's look at how frequently each type of
+part of speech occurs across all statements.
+
+### Summary Statistics
+
+First, let's look at some summary statistics. In the table below, for each part of
+speech, I computed the median number of times it occured across all statements, as
+well as some distributional information (e.g. percentile_95 indicates the 95th percentile
+for that part of speech). And then I sorted this list by the parts of speech
+that occured most frequently (as measured by median number of occurences).
+As we can see, the part of speech that occurs most frequently across our
+statemetns are verbs (with a median of 12 occurences), followed by nouns
+and then pronouns.
+
+```{r}
+stats_pos %>%
+  gather(key = part_of_speech,
+         value = n,
+         pos_ADJ:pos_X) %>%
+  group_by(part_of_speech) %>%
+  summarise(median = median(n),
+         percentile_5 = quantile(n, probs = c(0.05)),
+         percentile_10 = quantile(n, probs = c(0.10)),
+         percentile_25 = quantile(n, probs = c(0.25)),
+         percentile_75 = quantile(n, probs = c(0.75)),
+         percentile_90 = quantile(n, probs = c(0.90)),
+         percentile_95 = quantile(n, probs = c(0.95))) %>%
+  arrange(desc(median))
+
+```
+
+### Distributions
+
+And now let's visualize the distribution of the frequency with which various parts
+of speech occur. (Note: I eliminated any statements where a part of speech occured
+more than 20 times, as this is well above the 95th percentile for almost all types
+of parts of speech; and including the few statements with an extreme number of parts
+of speech would distort the x-axis to an extent that the distribution would become hard to view.)
+As we can see, some parts of speech occur much more frequency and with more
+variability than others (e.g. adjectives usually occur around 5 times in these
+statements, but the modal number of times than an interjection occurs is zero
+in these statements).
+
+
+```{r, fig.width=8, fig.height=8}
+stats_pos %>%
+  gather(key = part_of_speech,
+         value = n,
+         pos_ADJ:pos_X) %>%
+  filter(n < 20) %>%
+  ggplot(aes(x = n,
+             fill = part_of_speech)) +
+    geom_histogram() +
+    facet_wrap( ~part_of_speech,
+                ncol = 4,
+                scales = "free") +
+  guides(fill=FALSE) # remove legend
+  
+```
+
+# Save
+
+Finally, let's save the new data object we created, which for each statement
+records the number of times various parts of speech occurred.
+
+```{r, eval=FALSE}
+save(stats_pos,
+     file = "stats_pos.Rda")
+
+# now remove stats_clean from global environment (to avoid later confusion)
+rm(stats_clean)
+```
+
+
+# Render
+
+(This section is just for me. And is a note on how to render this to html
+format, given the use of spacyr complicates the process a tiny bit).
+
+* render from the R console (remember to setwd() to correct wd)
+* use the following command to render from console: rmarkdown::render("hld_FEATURE_pos.Rmd")
+* for chunks that are difficult to run (i.e. spacy_install), set the chunk option
+at the top to false (i.e. {r, evale = FALSE}), and run the rest of the script without it
+(this is not great for reproducibility, but worse I would argue is not being able
+to render the document at all; all alternatives are even less reproducible)
+* thus, you are rendering from the current session; good discusison here:
+https://stackoverflow.com/questions/34591487/difference-compile-pdf-button-in-rstudio-vs-knit-and-knit2pdf/48494678
+
+
+
+# Citations
+
+* Bucci, W., & Freedman, N. (1981). The language of depression. 
+Bulletin of the Menninger Clinic, 45(4), 334.
+
+* Newman, M. L., Pennebaker, J. W., Berry, D. S., & Richards, J. M. (2003).
+Lying words: Predicting deception from linguistic styles. Personality and 
+social psychology bulletin, 29(5), 665-675.
+
+* Pennebaker, J. (2011). The Secret Life of Pronouns: 
+What Our Words Say about Us. New York: Bloomsbury Press.
+
+* Pennebaker, J. W., Mehl, M. R., & Niederhoffer, K. G. (2003). 
+Psychological aspects of natural language use: Our words, our selves.
+Annual Review of Psychology, 54(1), 547-577.
+
+* Pérez-Rosas, V., & Mihalcea, R. (2015). Experiments in open domain deception 
+detection. Proceedings of the 2015 Conference on Empirical Methods in Natural 
+Language Processing, 1120-1125.
+
+* Stirman, S. W., & Pennebaker, J. W. (2001). Word use in the poetry of 
+suicidal and nonsuicidal poets. Psychosomatic Medicine, 63(4), 517-522.
+
+
+# END

@@ -1,0 +1,333 @@
+---
+title: "Data Overview"
+output:
+  html_document:
+    df_print: paged
+    code_folding: show
+---
+
+[return to [overview page](./hld_OVERVIEW.html)]
+
+Before delving deeper into the data, I will first give an overview of the data,
+so that you might get a better "feel" for the basic structure and nature of the
+responses (statements) that people provided. I will do this by going through each
+of the six questions to which people responded, and showing a sample set of
+responses for each question.
+
+# Packages
+
+Before loading in any of the data, I will first load some very useful packages
+in R that will faciliated analysis and cleaning of the data.
+
+```{r, message=FALSE, warning=FALSE}
+# this is actually a series of packages, highly useful for cleaning and visualizing data
+library(tidyverse)
+```
+
+# Import
+
+Next, I will import the statements, which are stored in a csv file. I will
+import and then store these statements in an object called "stats_raw" (i.e.
+raw statements). (Note I have already done some pre-procesing, which I decided to
+spare you from here. For example, I already eliminated responses from anyone
+who did not respond to all six questions with both a true statement and a
+false statement. I also eliminated some empty columns and renamed
+columns to make their meaning clearer.)
+
+[Note, that you can toggle the display of the code, by clicking the button 
+labeled "hide"/"code" on the right, above each code block,]
+
+```{r, message=FALSE, warning=FALSE}
+# First, load in the statements
+stats_raw <- read.csv(file = "statements_final.csv")
+
+```
+
+# Basics
+
+First, let's look at some very basic features of the data set, to get a 
+better understanding of its basic structure and organization.
+
+To begin, let's look at the basic dimensions of the dataset -- that is the
+number of rows and columns.
+
+```{r}
+dim(stats_raw)
+```
+
+Above, we see that the dataset has 5004 rows, and 13 columnns.
+
+Let's examine what those columns are.
+
+```{r}
+# See the names of the columns
+colnames(stats_raw)
+
+```
+
+As we see, we have the following columns
+
+Column Name  | Content
+------------- | -----------------------------------------------------------------
+per_id  | unique identification number for each participant
+stat_id  | unique identification number for each statement
+q_num | the question (of the six) to which this statement is a response
+grd_truth | "ground truth", a column indicating whether the statment is a lie or a truth
+statement | this contains the entire text of the participants response
+stat_method | for each lie, the participants written explanation for how they generated that lie (empty for truths)
+stat_type | for each lie, the participant's multiple choice response for whether the response is based more on fantasy or reality (empty for truth)
+order_first | the order in which participants completed the statements (lie followed by truths, or truths followed by lies)
+sex | the participants self-reported sex
+age | the participants self-reported age in years
+race | the participants self-reported race/ethnicity
+rand | a random number (previously used to sort the statements)
+rand_order | a number ranking each statement by the previous random number (i.e. lowest random # gets 1, second lowest gets 2, etc)
+
+Finally, let's take a little preview at a few full rows of the data, to also
+get a better sense of the structure. (Note: the columns appear in the order
+"per_id", "stat_id", "q_num", etc. You can view more columns, by clicking
+the right pointing arrow following at the right of the right-most
+column name.)
+
+```{r}
+head(stats_raw)
+```
+
+
+# Statements
+
+Okay, now let's look at some of the responses provided by participants, to each
+of the six questions.
+
+## Question 1: Meeting
+
+The first question instructed participants to "Describe how you met [person you know well]."
+Let's look at some of the responses participants gave.
+
+### Truthful Responses (Q1)
+
+Here is a sample of 5 truthful responses.
+(Note: I've re-arranged the columns here, so that the statement text appears as the
+firsct column.)
+
+```{r}
+# display 5 true responses to question 1, by pre-computed random number
+stats_raw %>%
+  filter(q_num == 1,
+         grd_truth == "truth") %>%
+  arrange(rand_order) %>%
+  select(statement,
+         everything()) %>%
+  top_n(5)
+
+```
+
+### Untruthful Responses, i.e. lies (Q1)
+
+And here is a sample of 5 lies.
+
+```{r}
+# display 5 untruthful responses to question 1, by pre-computed random number
+stats_raw %>%
+  filter(q_num == 1,
+         grd_truth == "lie") %>%
+  arrange(rand_order) %>%
+  select(statement,
+         everything()) %>%
+  top_n(5)
+
+```
+
+
+## Question 2: Regret
+
+The second question asked participants: "What is something in your life that
+you regret (i.e. wish you had done differently)?"
+
+### Truthful Responses (Q2)
+
+Here is a sample of 5 truthful responses.
+
+```{r}
+# display 5 true responses to question 2, by pre-computed random number
+stats_raw %>%
+  filter(q_num == 2,
+         grd_truth == "truth") %>%
+  arrange(rand_order) %>%
+  select(statement,
+         everything()) %>%
+  top_n(5)
+
+```
+
+### Untruthful Responses, i.e. lies (Q2)
+
+And here is a sample of 5 lies.
+
+```{r}
+# display 5 untruthful responses to question 2, by pre-computed random number
+stats_raw %>%
+  filter(q_num == 2,
+         grd_truth == "lie") %>%
+  arrange(rand_order) %>%
+  select(statement,
+         everything()) %>%
+  top_n(5)
+
+```
+
+
+## Question 3: Yesterday
+
+The third question instructed participants to: "Please describe what you did
+yesterday."
+
+### Truthful Responses (Q3)
+
+Here is a sample of 5 truthful responses.
+
+```{r}
+# display 5 true responses to question 3, by pre-computed random number
+stats_raw %>%
+  filter(q_num == 3,
+         grd_truth == "truth") %>%
+  arrange(rand_order) %>%
+  select(statement,
+         everything()) %>%
+  top_n(5)
+
+```
+
+### Untruthful Responses, i.e. lies (Q3)
+
+And here is a sample of 5 lies.
+
+```{r}
+# display 5 untruthful responses to question 3, by pre-computed random number
+stats_raw %>%
+  filter(q_num == 3,
+         grd_truth == "lie") %>%
+  arrange(rand_order) %>%
+  select(statement,
+         everything()) %>%
+  top_n(5)
+
+```
+
+## Question 4: Liking
+
+The fourth question instructed participants to: "Give some reason why you
+like [person you like/dislike]" (where the name of a person they listed as
+as person they like was piped in when they were asked for a truthful response,
+and the name of a person they listed as a person they disliked was piped in
+when they were asked for a un untruthful response).
+
+### Truthful Responses (Q4)
+
+Here is a sample of 5 truthful responses.
+
+```{r}
+# display 5 true responses to question 4, by pre-computed random number
+stats_raw %>%
+  filter(q_num == 4,
+         grd_truth == "truth") %>%
+  arrange(rand_order) %>%
+  select(statement,
+         everything()) %>%
+  top_n(5)
+
+```
+
+### Untruthful Responses, i.e. lies (Q4)
+
+And here is a sample of 5 lies.
+
+```{r}
+# display 5 untruthful responses to question 4, by pre-computed random number
+stats_raw %>%
+  filter(q_num == 4,
+         grd_truth == "lie") %>%
+  arrange(rand_order) %>%
+  select(statement,
+         everything()) %>%
+  top_n(5)
+
+```
+
+## Question 5: Strength
+
+The fifth question instructed participants: "Describe a personal strength 
+of yours (i.e. something that you are good at)."
+
+### Truthful Responses (Q5)
+
+Here is a sample of 5 truthful responses.
+
+```{r}
+# display 5 true responses to question 5, by pre-computed random number
+stats_raw %>%
+  filter(q_num == 5,
+         grd_truth == "truth") %>%
+  arrange(rand_order) %>%
+  select(statement,
+         everything()) %>%
+  top_n(5)
+
+```
+
+### Untruth Responses, i.e. lies (Q5)
+
+And here is a sample of 5 lies.
+
+```{r}
+# display 5 untruthful responses to question 5, by pre-computed random number
+stats_raw %>%
+  filter(q_num == 5,
+         grd_truth == "lie") %>%
+  arrange(rand_order) %>%
+  select(statement,
+         everything()) %>%
+  top_n(5)
+
+```
+
+## Question 6: Hobby
+
+In the sixth question, participants were asked: "What is a hobby of yours
+or something that you enjoy doing in your free time? And why do you enjoy it?"
+
+### Truthful Responses (Q6)
+
+Here is a sample of 5 truthful responses.
+
+```{r}
+# display 5 true responses to question 6, by pre-computed random number
+stats_raw %>%
+  filter(q_num == 6,
+         grd_truth == "truth") %>%
+  arrange(rand_order) %>%
+  select(statement,
+         everything()) %>%
+  top_n(5)
+
+```
+
+
+### Untruth Responses, i.e. lies (Q6)
+
+And here is a sample of 5 lies.
+
+```{r}
+# display 5 untruthful responses to question 6, by pre-computed random number
+stats_raw %>%
+  filter(q_num == 6,
+         grd_truth == "lie") %>%
+  arrange(rand_order) %>%
+  select(statement,
+         everything()) %>%
+  top_n(5)
+
+```
+
+
+# END

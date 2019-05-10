@@ -1,0 +1,328 @@
+---
+title: "Modeling (Logistic Regression ETC)"
+output:
+  html_document:
+    df_print: paged
+    code_folding: show
+---
+
+[return to [overview page](./hld_OVERVIEW.html)]
+
+I will now move on to building predictive models, to use the features
+that we just just extracted from the text, to build predictive models of
+which statements are lies and which statements are truths.
+
+# Packages
+
+Again, I will start by loading relevant packages.
+
+```{r, message=FALSE, warning=FALSE}
+# before knitting: message = FALSE, warning = FALSE
+library(tidyverse) # cleaning and visualization
+library(ggthemes) # visualization
+library(caret) # modeling
+library(AppliedPredictiveModeling)
+library(pROC) # ROC curve
+library(e1071)
+```
+
+# Load Data
+
+First, I will load the various cleaned versions of the data we just
+created.
+
+```{r}
+# load all the nice tidy df's of features we created (remember stats_words has multiple dtm's)
+load("stats_all.Rda")
+
+# load individual feature dfs (for training individual models)
+load("stats_clean.Rda")
+load("stats_length.Rda")
+load("stats_pos.Rda")
+load("stats_sent.Rda")
+load("stats_complex.Rda")
+load("stats_words.Rda")
+
+```
+
+
+
+# Data Splitting (Full Dataset)
+
+Split my data into training and test set
+
+```{r}
+# SPLIT 1: 50-50 split
+# make indices for training set
+t_index <- createDataPartition(y = stats_all$grd_truth,
+                               p = 0.5,
+                               list = FALSE)
+
+# check length of index vector
+length(t_index)
+
+```
+
+
+```{r}
+# SPLIT 2: 5-95 split
+# make indices for training set
+t_index_5 <- createDataPartition(y = stats_all$grd_truth,
+                               p = 0.05,
+                               list = FALSE)
+
+# check length of index vector
+length(t_index_5)
+
+```
+
+
+# Create subsets (test and train)
+
+50-50 split
+
+```{r}
+# SPLIT 1: 50-50 split
+# create train and test subsets
+stats_train1 <- stats_all[t_index, ]
+stats_test1 <- stats_all[-t_index, ]
+
+# check lengths of train and test subsets
+nrow(stats_train1)
+nrow(stats_test1)
+```
+
+5-95 split
+
+```{r}
+# SPLIT 1: 50-50 split
+# create train and test subsets
+stats_train_5 <- stats_all[t_index_5, ]
+stats_test_5 <- stats_all[-t_index_5, ]
+
+# check lengths of train and test subsets
+nrow(stats_train_5)
+nrow(stats_test_5)
+
+```
+
+
+
+# Build model
+
+50-50 split model
+
+```{r}
+# train logistic regression model
+model_log1 <- train(form = grd_truth ~ . - stat_id,
+                    data = stats_train1,
+                    method = "glm",
+                    family = "binomial")
+
+model_log1
+summary(model_log1)
+
+```
+
+5-95 split model
+
+```{r}
+# train model
+model_log_5 <-
+  train(form = grd_truth ~ . - stat_id,
+        data = stats_train_5,
+        method = "glm",
+        family = "binomial")
+
+model_log_5
+summary(model_log_5)
+
+
+```
+
+
+Try out trainControl() function
+
+* useful links
+  + https://github.com/topepo/caret/issues/240
+  + https://www.rdocumentation.org/packages/caret/versions/6.0-80/topics/extractPrediction
+  + https://stats.stackexchange.com/questions/114168/how-to-get-sub-training-and-sub-test-from-cross-validation-in-caret/114224
+  + https://stackoverflow.com/questions/50182227/how-can-i-get-extract-cross-validation-accuracy-after-training-in-caret
+
+```{r}
+# train model
+model_test <-
+  train(form = grd_truth ~ . - stat_id,
+        data = stats_all,
+        method = "glm",
+        family = "binomial",
+        trControl = trainControl(method = "repeatedcv",
+                                 number= 10,
+                                 repeats = 2,
+                                 classProbs = TRUE,
+                                 savePredictions = TRUE))
+
+# look at and take apart the object you just created
+model_test
+class(model_test)
+attributes(model_test)
+model_test$resample # gives accuracy from each mode
+model_test$pred # get predictions from each fold in the cross validation
+summary(model_test)
+
+extractPrediction(list(model_test))
+```
+
+
+
+
+# Predict on new data
+
+50-50 model
+
+```{r}
+# generate predictions for test set
+pred_model_log1 <-
+  predict(object = model_log1,
+          newdata = stats_test1,
+          type = "raw")
+
+# generate probabilites (for predictions) for test set
+prob_model_log1 <-
+  predict(object = model_log1,
+          newdata = stats_test1,
+          type = "prob")
+
+# show first 7 predictions
+pred_model_log1[1:7]
+
+# show first 7 probabilities (for predictions)
+prob_model_log1[1:7, ]
+
+```
+
+
+5-95 model
+
+```{r}
+# generate predictions for test set
+pred_model_log_5 <-
+  predict(object = model_log_5,
+          newdata = stats_test_5,
+          type = "raw")
+
+# generate probabilites (for predictions) for test set
+prob_model_log_5 <-
+  predict(object = model_log_5,
+          newdata = stats_test_5,
+          type = "prob")
+
+# show first 7 predictions
+pred_model_log_5[1:7]
+
+# show first 7 probabilities (for predictions)
+prob_model_log_5[1:7, ]
+```
+
+
+
+# Predict on new data and evaluate (using confusion matrix)
+
+50-50 model
+
+```{r}
+# make confusion matrix
+conf_1 <-
+  confusionMatrix(data = pred_model_log1,
+                reference = stats_test1$grd_truth,
+                positive = "truth")
+
+# attributes
+attributes(conf_1)
+
+# print confusion matrix
+conf_1
+
+# extract specific objects from confusion matrix
+conf_1$byClass[2] # for example: specificity
+```
+
+5-95 model
+
+
+```{r}
+# make confusion matrix
+conf_5 <-
+  confusionMatrix(data = pred_model_log_5,
+                reference = stats_test_5$grd_truth,
+                positive = "truth")
+
+# print confusion matrix
+conf_5
+
+
+```
+
+
+# ROC curve
+
+## ROC curve (make roc object)
+```{r}
+# make object
+model_log1_roc <-
+  roc(response = stats_test1$grd_truth,
+      predictor = prob_model_log1$truth)
+
+# print object
+model_log1_roc
+```
+
+## ROC curve (area under curve, AUC)
+
+```{r}
+auc(model_log1_roc)
+```
+
+
+## ROC curve (AUC confidence interval)
+
+```{r}
+ci(model_log1_roc)
+```
+
+## ROC curve (actual graph)
+
+```{r, fig.width=7, fig.height=7}
+plot(model_log1_roc,
+     legacy.axes = TRUE,
+     xlim = c(1, 0),
+     ylim = c(0, 1))
+```
+
+# Calibration Curve (Create)
+
+```{r}
+# get items needed to make calibration object
+# stats_test1$grd_truth
+stats_test1$log1_prob <- prob_model_log1$truth
+
+# make calibration object
+model_log1_cal <-
+  calibration(data = stats_test1,
+              grd_truth ~ log1_prob,
+              cuts = 21)
+
+# print calibration object
+model_log1_cal
+```
+
+# Calibration Curve (Graph)
+
+Wow, this plot is super fucked (and I'm guessing it's because of the really skewed data).
+(Unless, somehow did I just enter the opposite values for one column?)
+
+```{r}
+xyplot(model_log1_cal,
+       auto.ley = list(columns = 2))
+```
+

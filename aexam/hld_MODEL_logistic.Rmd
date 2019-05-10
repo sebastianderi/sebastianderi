@@ -1,0 +1,421 @@
+---
+title: "Modeling (Logistic Regression)"
+author: Sebastian Deri
+output:
+  html_document:
+    df_print: paged
+    code_folding: show
+---
+
+[return to [overview page](./hld_OVERVIEW.html)]
+
+I will now move on to building predictive models, to use the features
+that we just just extracted from the text, to build predictive models of
+which statements are lies and which statements are truths.
+
+# Packages
+
+Again, I will start by loading relevant packages.
+
+```{r, message=FALSE, warning=FALSE}
+# before knitting: message = FALSE, warning = FALSE
+library(tidyverse) # cleaning and visualization
+library(ggthemes) # visualization
+library(caret) # modeling
+library(AppliedPredictiveModeling)
+library(pROC) # ROC curve
+```
+
+# Load Data
+
+First, I will load the various cleaned versions of the data we just
+created.
+
+```{r}
+# load all the nice tidy df's of features we created (remember stats_words has multiple dtm's)
+load("stats_all.Rda")
+
+# load individual feature dfs (for training individual models)
+load("stats_clean.Rda")
+load("stats_length.Rda")
+load("stats_pos.Rda")
+load("stats_sent.Rda")
+load("stats_complex.Rda")
+load("stats_words.Rda")
+
+```
+
+
+# EXAMPLE (Single Predictive Logistic Regression Model)
+
+## Split Sample Into Training and Testing Sets
+
+```{r}
+# partition data in 50-50 lgocv split (create index for test set)
+log_ex_train_index <- 
+  createDataPartition(y = stats_all$stat_id,
+                      p = 0.50,
+                      times = 1,
+                      list = FALSE)
+
+# actually create data frame with training set (predictors and outcome together)
+log_ex_train <- stats_all[log_ex_train_index, ]
+
+# actualy create data frame with test set (predictors and outcome together)
+log_ex_test <- stats_all[-log_ex_train_index, ]
+
+```
+
+## Build Model
+
+```{r}
+# use caret "train" function to train logistic regression model
+log_ex_model <- 
+  train(form = grd_truth ~ . - stat_id,
+        data = log_ex_train,
+        method = "glm",
+        family = "binomial",
+        preProcess = c("center", "scale"))
+
+# display model summary
+log_ex_model
+
+attributes(log_ex_model)
+
+summary(log_ex_model$finalModel)
+
+```
+
+
+# FULL (Predictive Logistic Regression Models)
+
+# OTHER ANALYSES
+
+
+# Build Models
+
+This took half an hour to run (although, it did involve created and storing
+the results from 960 separate models).
+
+```{r, warning=FALSE, cache=TRUE, eval=FALSE}
+# NOTE: warnings are turned off
+
+# -----------------------------------------------------------------------------
+# STEP 1: split probabilities to loop through
+split_probs <- c(0.01, 0.02, 0.05, seq(from = 0.10, to = 0.90, by = 0.10))
+
+# -----------------------------------------------------------------------------
+# STEP 2: decide how many times to run each model
+rounds <- 10
+
+# -----------------------------------------------------------------------------
+# STEP 3: create list of all df's to look through
+feature_sets <- list(stats_dtm_10, stats_dtm_25, stats_dtm_50, stats_dtm_100,
+                     stats_length, stats_pos, stats_sent, stats_complex)
+feature_names <- list("top 10 words", "top 25 words", "top 50 words", "top 100 words",
+                      "length", "parts of speech", "sentiment", "readability")
+feature_sets <- list(feature_sets, feature_names)
+num_feature_sets <- length(feature_sets[[1]])
+
+# -----------------------------------------------------------------------------
+# STEP 4: set up object to store results
+# part a: create matrix
+results <-
+  matrix(nrow = num_feature_sets * length(split_probs) * rounds,
+         ncol = 7)
+# part b: name columns
+colnames(results) <- c("feature_set", "split", "round", "accuracy", "sensitivity", "specificity", "precision")
+# part c: convert to df (so multiple variables of different types can be stored)
+results <- data.frame(results)
+
+# -----------------------------------------------------------------------------
+# STEP 5: build models
+# part a: initialize counter
+counter = 0
+# part b: set up timer
+start_time <- Sys.time()
+# part c: loop through each feature set
+for (i in 1:num_feature_sets){
+  
+  # store current feature set
+  feature_set_i <- feature_sets[[1]][[i]]
+  
+  # house-keeping: attach ground truth data to feature set (if feature set does not have it)
+  if(!("grd_truth" %in% colnames(feature_set_i))){
+    feature_set_i <-
+      feature_set_i %>%
+        mutate(stat_id = as.integer(stat_id)) %>%
+        left_join(y = (stats_all %>%
+                         select(stat_id,
+                                grd_truth)),
+                  by = "stat_id")
+  }
+# part d: loop through all training split probabilities
+  for (split_i in split_probs) {
+    
+# part e: loop through each training split probability, round number of times
+    for (round_i in 1:rounds){
+      
+      # increment counter
+      counter = counter + 1
+      
+      # record current feature set
+      results[counter, 1] <- feature_sets[[2]][[i]]
+      
+      # record current split
+      results[counter, 2] <- split_i
+      
+      # record current round
+      results[counter, 3] <- round_i
+      
+      # create partition
+      index_i <- createDataPartition(y = feature_set_i$grd_truth,
+                                     p = split_i,
+                                     list = FALSE)
+      
+      # create training and test set
+      train_set <- feature_set_i[index_i, ]
+      test_set <- feature_set_i[-index_i, ]
+      
+      # make model
+      model_i <-
+        train(form = grd_truth ~ . - stat_id,
+              data = train_set,
+              method = "glm",
+              family = "binomial")
+      
+      # make predictions
+      model_preds <-
+        predict(object = model_i,
+                newdata = test_set,
+                type = "raw")
+      
+      # record model performance
+      conf_i <-
+        confusionMatrix(data = model_preds,
+                        reference = test_set$grd_truth,
+                        positive = "truth")
+      
+      # record accuracy
+      results[counter, 4] <- conf_i$overall[1]
+      
+      # get sensitivity
+      results[counter, 5] <- conf_i$byClass[1]
+      
+      # get specificity
+      results[counter, 6] <- conf_i$byClass[2]
+      
+      # get precision
+      results[counter, 7] <- conf_i$byClass[3]
+      
+      # print progress
+      print(paste("iteration: ", counter, sep = ""))
+    }
+  }
+}
+
+# part f: record total time
+total_time <- Sys.time() - start_time
+
+```
+
+
+# Results
+
+## Results (Collect Summary Statistics)
+
+```{r}
+# get average for each round
+results_summ <-
+  results %>%
+    # dplyr::mutate(split = as.factor(split)) %>%
+    dplyr::group_by(feature_set, split) %>%
+    dplyr::summarise(avg_accuracy = mean(accuracy),
+                     min_accuracy = min(accuracy),
+                     max_accuracy = max(accuracy),
+                     avg_sensitivity = mean(sensitivity),
+                     min_sensitivity = min(sensitivity),
+                     max_sensitivity = max(sensitivity),
+                     avg_specificity = mean(specificity),
+                     min_specificity = min(specificity),
+                     max_specificity = max(specificity),
+                     avg_precision = mean(precision),
+                     min_precision = min(precision),
+                     max_precision = max(precision)) %>%
+  mutate(feature_set = factor(feature_set,
+                              levels = c("top 10 words",
+                                         "top 25 words",
+                                         "top 50 words",
+                                         "top 100 words",
+                                         "length",
+                                         "readability",
+                                         "parts of speech",
+                                         "sentiment")))
+# look over results
+results_summ
+
+```
+
+## Results (Overall Accuracy)
+
+```{r, fig.width=9, fig.height=6}
+# set colors
+color_map <- c("top 10 words" = "#91C68D",
+               "top 25 words" = "#55C66E",
+               "top 50 words" = "#45B731",
+               "top 100 words" = "#166B28",
+               "length" = "#CB4154",
+               "readability" = "#1D588E",
+               "parts of speech" = "#ED721A",
+               "sentiment" = "#EDD41A")
+
+# print plot
+ggplot(data = results_summ,
+       aes(x = round(split * 100, 1),
+           y = round(avg_accuracy * 100, 1),
+           color = feature_set)) +
+  geom_point(size = 2) +
+  geom_line(size = 0.5) +
+  geom_errorbar(aes(ymin = round(min_accuracy * 100, 1),
+                  ymax = round(max_accuracy * 100, 1)),
+                alpha = 0.5,
+                width = 0) +
+  geom_hline(yintercept = 50,
+             color = "grey",
+             linetype = "dotted",
+             size = 1) +
+  scale_x_continuous(breaks = (split_probs * 100)) +
+  scale_y_continuous(breaks = seq(from = 47, to = 65, by = 1)) +
+  scale_color_manual(values = color_map) +
+  labs(x = "Percent of Data Used for Training",
+       y = "Accuracy (avg. of 10 models)",
+       title = "Accuracy v. Amount of Training, by Features in Model",
+       color = "Features") +
+  theme_solarized() +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45),
+        panel.grid.minor = element_blank(),
+        legend.key = element_rect(color = "transparent", fill = "transparent"),
+        axis.title.y = element_text(margin = margin(t = 0, r = 8, b = 0, l = 0)))
+```
+
+
+## Results (Sensitivity, i.e. Truth Detection)
+
+```{r, fig.width=9, fig.height=6}
+# print plot
+ggplot(data = results_summ,
+       aes(x = round(split * 100, 1),
+           y = round(avg_sensitivity * 100, 1),
+           color = feature_set)) +
+  geom_point(size = 2) +
+  geom_line(size = 0.5) +
+  # geom_errorbar(aes(ymin = round(min_sensitivity * 100, 1),
+  #                 ymax = round(max_sensitivity * 100, 1)),
+  #               alpha = 0.5,
+  #               width = 0) +
+  geom_hline(yintercept = 50,
+             color = "grey",
+             linetype = "dotted",
+             size = 1) +
+  scale_x_continuous(breaks = (split_probs * 100)) +
+  scale_y_continuous(breaks = seq(from = 39, to = 62, by = 1)) +
+  scale_color_manual(values = color_map) +
+  labs(x = "Percent of Data Used for Training",
+       y = "Sensitivity (avg. of 10 models)",
+       title = "Sensitivity v. Amount of Training, by Features in Model",
+       color = "Features") +
+  theme_solarized() +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45),
+        panel.grid.minor = element_blank(),
+        legend.key = element_rect(color = "transparent", fill = "transparent"),
+        axis.title.y = element_text(margin = margin(t = 0, r = 8, b = 0, l = 0)))
+```
+
+
+## Results (Specificity, i.e. Lie Detection)
+
+```{r, fig.width=9, fig.height=6}
+# print plot
+ggplot(data = results_summ,
+       aes(x = round(split * 100, 1),
+           y = round(avg_specificity * 100, 1),
+           color = feature_set)) +
+  geom_point(size = 2) +
+  geom_line(size = 0.5) +
+  # geom_errorbar(aes(ymin = round(min_specificity * 100, 1),
+  #                 ymax = round(max_specificity * 100, 1)),
+  #               alpha = 0.5,
+  #               width = 0) +
+  geom_hline(yintercept = 50,
+             color = "grey",
+             linetype = "dotted",
+             size = 1) +
+  scale_x_continuous(breaks = (split_probs * 100)) +
+  scale_y_continuous(breaks = seq(from = 48, to = 63, by = 1)) +
+  scale_color_manual(values = color_map) +
+  labs(x = "Percent of Data Used for Training",
+       y = "Specificity (avg. of 10 models)",
+       title = "Specificity v. Amount of Training, by Features in Model",
+       color = "Features") +
+  theme_solarized() +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45),
+        panel.grid.minor = element_blank(),
+        legend.key = element_rect(color = "transparent", fill = "transparent"),
+        axis.title.y = element_text(margin = margin(t = 0, r = 8, b = 0, l = 0)))
+
+```
+
+
+## Results (Precision)
+
+
+```{r, fig.width=9, fig.height=6}
+# print plot
+ggplot(data = results_summ,
+       aes(x = round(split * 100, 1),
+           y = round(avg_precision * 100, 1),
+           color = feature_set)) +
+  geom_point(size = 2) +
+  geom_line(size = 0.5) +
+  # geom_errorbar(aes(ymin = round(min_precision * 100, 1),
+  #                 ymax = round(max_precision * 100, 1)),
+  #               alpha = 0.5,
+  #               width = 0) +
+  geom_hline(yintercept = 50,
+             color = "grey",
+             linetype = "dotted",
+             size = 1) +
+  scale_x_continuous(breaks = (split_probs * 100)) +
+  scale_y_continuous(breaks = seq(from = 40, to = 70, by = 1)) +
+  scale_color_manual(values = color_map) +
+  labs(x = "Percent of Data Used for Training",
+       y = "Precision (avg. of 10 runs)",
+       title = "Precision v. Amount of Training, by Features in Model",
+       color = "Features") +
+  theme_solarized() +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45),
+        panel.grid.minor = element_blank(),
+        legend.key = element_rect(color = "transparent", fill = "transparent"),
+        axis.title.y = element_text(margin = margin(t = 0, r = 8, b = 0, l = 0)))
+
+```
+
+
+# Save
+
+```{r}
+save(results,
+     file = "log_results1.Rda")
+```
+
+# Render
+
+Again, some chunks which take long to evaluate are not evaluating and instead saved/loaded from
+current directory. Rendering with: rmarkdown::render("hld_MODEL_logistic.Rmd")
+
+
+# END

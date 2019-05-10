@@ -1,0 +1,88 @@
+---
+title: "Modeling (Support Vector Machine)"
+author: Sebastian Deri
+output:
+  html_document:
+    df_print: paged
+    code_folding: show
+---
+
+[return to [overview page](./hld_OVERVIEW.html)]
+
+I will now build a neural network predictive model.
+
+# Packages
+
+Again, I will start by loading relevant packages.
+
+```{r, message=FALSE, warning=FALSE}
+# before knitting: message = FALSE, warning = FALSE
+library(tidyverse) # cleaning and visualization
+library(ggthemes) # visualization
+library(caret) # modeling
+library(AppliedPredictiveModeling)
+library(pROC) # ROC curve
+```
+
+
+# Load Data
+
+Next, I will load the various cleaned versions of the data we just
+created.
+
+```{r}
+# load all the nice tidy df's of features we created (remember stats_words has multiple dtm's)
+load("stats_all.Rda")
+
+```
+
+## Step 1a: Split the Data (Index)
+
+```{r}
+# get index for random 50% of data, and count this as training data (rest will be test)
+index_neural <- createDataPartition(y = stats_all$grd_truth,
+                                 p = 0.50,
+                                 list = FALSE)
+
+# check length (should be 2502)
+length(index_neural)
+```
+
+## Step 1b: Split the Data (Actual Train and Test Set)
+
+```{r}
+train_neural <- stats_all[index_neural, ]
+test_neural <- stats_all[-index_neural, ]
+```
+
+
+```{r}
+# train model
+
+nnetGrid <- expand.grid(.size = 1:10,
+                        .decay = c(0, .1, 1, 2))
+maxSize <- max(nnetGrid$.size)
+numWts <- (maxSize * (length(names(stats_all))) + maxSize + 1)
+
+model_neural <-
+  train(x = train_neural[, !(names(train_neural) %in% c("stat_id", "grd_truth"))],
+        y = train_neural$grd_truth,
+        method = "nnet",
+        preProc = c("center", "scale", "spatialSign"),
+        # maxit = 2000,
+        trace = FALSE,
+        # MaxNWts = numWts,
+        tuneGrid = nnetGrid)
+
+# get predictions of model
+neural_predicts <-
+  predict(object = model_neural,
+          newdata = test_neural[, !(names(train_neural) %in% c("stat_id", "grd_truth"))])
+
+# confusion matrix, with results
+confusionMatrix(neural_predicts, test_neural$grd_truth)
+```
+
+
+
+

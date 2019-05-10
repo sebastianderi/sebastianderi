@@ -1,0 +1,299 @@
+---
+title: "Feature Extraction (Statement Length)"
+output:
+  html_document:
+    df_print: paged
+    code_folding: show
+---
+
+[return to [overview page](./hld_OVERVIEW.html)]
+
+The first features we are going to extract are very simple features which
+relate to the length of statements. These features are
+very easy to extract and may may provide some cue about the veracity of a statement. 
+In order to avoid being found out, people may give shorter and less detailed 
+responses when they are lying. DePaulo, Lindsay, Malone, Muhlenbruck, Charlton, 
+& Cooper (2003) review evidence from 120 studies about 158 different cues to
+deception. They find some evidence that liars are less "forthcoming" than
+truth-tellers (Table 3, p. 91; reproduced below). For example, liars spend 
+significantly less time talking than truth-tellers (d = -0.35). They also
+provide significantly fewer details when they respond (d = -0.30). 
+Although, the authors find no significant 
+differences between liars and truth-tellers and liars in response length per se.
+Nevertheless, because people seem to provide less information in various ways
+when lying than when telling the truth, it is worth trying to extract some proxy
+for this in our present dataset -- which may be provided by various measures of 
+statement length.
+
+![](./pics/depaulo_forthcoming_table3.png)
+
+# Packages
+
+Again, I will start by loading relevant packages.
+
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse) # cleaning and visualization
+library(quanteda) # text analysis
+```
+
+# Load Data
+
+Again, since this is a new analysis, I must load in the data that will be
+analyzed. This will be the cleaned tabular data structure I created just earlier in 
+[Feature Extraction (Overview)](./hld_FEATURE_overview.html).
+
+```{r, message=FALSE, warning=FALSE}
+# this loads: stats_clean (a data-frame of out cleaned statements)
+load("stats_clean.Rda")
+
+```
+
+# Number of words
+
+## Number of words (example)
+
+I am now going to go through each of the statements and count
+the number of words in each statement.
+
+I will begin with an example on a single sentence, just for illustration.
+The sentence I will use will be "Ithaca can get very cold in the winter",
+a sentence with eight words. By applying the ntoken()
+function from the quanteda package, we can count the number of words in this
+sentence, as show below.
+
+```{r}
+# Create sentence
+example_sent <- c("Ithaca can get very cold in the winter.")
+print(example_sent)
+
+# Extract number of words in sentence
+n_words_example <-
+  ntoken(x = example_sent,
+         remove_punct = TRUE) # remove punctuation when counting words
+
+# Print output
+print(paste("# words in sentence = ",
+            as.integer(n_words_example),
+            sep = ""))
+
+```
+
+## Number of words (full dataset)
+
+We will now simply apply this function to all of the 5004 statements in our
+dataset, and this will give us a count for the number of words in each statement!
+
+```{r}
+# store results in new column in the stats_clean2 data frame
+stats_clean$n_words <-
+  ntoken(x = stats_clean$statement,
+         remove_punct = TRUE) 
+
+```
+
+## Number of words (results)
+
+Let's take a look at what this gives us.
+
+### Histogram
+
+Across all our statements, here's what the distribution of word lengths looks
+like. From examining this histogram, it looks like most sentences have about 40-100 words,
+but a few sentences have many more words. Thus distribution is definitely skewed.
+We will just note that for now. (We may later transform this data, to adjust that skew,
+when building various models.) 
+
+```{r}
+ggplot(data = stats_clean,
+       aes(x = n_words)) +
+  geom_histogram() +
+  labs(title = "Histogram of Word Counts Across Statements") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+### Empirical Cumulative Distribution
+
+A better way to visualize the nature of this skewed distribution might be
+with a plot of the Empirical Cumulative Distribution (ECD), which
+charts the values of a variable in sequential order on the x-axis, and
+charts the cumulative percentage of values which fall at or below that value
+on the y-axis. As we can see from this plot, more than 95% of statements
+are below 100 words. Most statments (i.e. the "middle" 90% of the statements, which
+I highlighted between the red lines) seem to be between about 35 and 100 words.
+
+```{r}
+ggplot(data = stats_clean,
+       aes(x = n_words)) +
+  stat_ecdf(geom = "step") +
+  labs(y = "proportion of statements at or below this length",
+       title = "Empirical Cumulative Distribution of Word Counts") +
+  scale_y_continuous(breaks = seq(from = 0,
+                                  to = 1.0,
+                                  by = 0.1)) +
+  scale_x_continuous(breaks = seq(from = 0,
+                                  to = 500,
+                                  by = 25)) +
+  geom_hline(yintercept = 0.05,
+             color = "red",
+             linetype = "dashed") +
+  geom_hline(yintercept = 0.95,
+             color = "red",
+             linetype = "dashed") +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 45))
+
+```
+
+### Exact Percentiles
+
+In fact, we can compute the percentiles more exactly. Here are the number of words
+at the following percentiles: 1%, 5%, 25%, 50%, 75%, 95%, 99%.
+
+```{r}
+data.frame(
+  quantile(stats_clean$n_words,
+         probs = c(0.01,
+                   0.05,
+                   0.25,
+                   0.50,
+                   0.75,
+                   0.95,
+                   0.99))) %>%
+  rename_at(1, ~ "n_words")
+  
+
+```
+
+### Long Statements
+
+So what are those really long statments? Let's have a look. I am going to
+arrange the statements by number of words, starting with the longest ones first.
+From looking at this output, we can note two things. First, there are really 
+just a handful of statements that are way outside of the norm. And second, the 
+extraordinarily long responses seem to be genuine responses where the participant 
+simply just wrote a lot.
+
+```{r}
+stats_clean %>%
+  arrange(desc(n_words)) %>%
+  select(n_words,
+         statement)
+```
+
+### Word length by question
+
+And how do the word counts vary by the specific question participants are
+responding to? Let's examine that here. (I am going to filter out the handful
+or responses that are extremely long, above 150 words, so that the x-axis
+of the distributions aren't so long that the distributions can't really be
+compared visually.) In the histograms below, we see that there aren't
+any gargantuan differences in the word count distributions between questions.
+
+
+```{r, fig.width=8, fig.height=12}
+stats_clean %>%
+  filter(n_words < 150) %>%
+  mutate(q_num = factor(q_num,
+                        labels = c("Q1 (Meeting)",
+                                   "Q2 (Regret) ",
+                                   "Q3 (Yesterday)",
+                                   "Q4 (Liking)",
+                                   "Q5 (Strength)",
+                                   "Q6 (Hobby)"))) %>%
+  ggplot(aes(x = n_words)) +
+  geom_histogram() +
+  labs(title = "Histogram of Word Counts By Question") +
+  facet_wrap( ~ q_num,
+              ncol = 1) +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+
+# Unique Words
+
+I am also going to compute two other basic count metrics. One is the number of
+unique words in each statement (i.e. the sentence "This sentence has many, many
+many redundant words." has 8 words, and 6 unique words). And the second is
+a metric derived from this which is the proportion of unique words in each
+statement (i.e. number of unique words / total number of words).
+
+## Unique Words (Example)
+
+Again, here is an example for illustrative purposes.
+
+```{r}
+# Create sentence
+example_sent2 <- c("This sentence has many, many many redundant words")
+print(example_sent2)
+
+# ntype() is also from the quanteda package and counts unique tokens
+n_unique_example <-
+  ntype(x = example_sent2,
+        remove_punct = TRUE) # remove punctuation again
+
+# Print output
+print(paste("# unique words in sentence = ",
+            as.integer(n_unique_example),
+            sep = ""))
+
+```
+
+## Unique Words (Full Dataset)
+
+And now let's apply this to all 5004 statements (that is, extract
+both the number of unique words for each statement, and the
+proportion of unique words in each statement).
+
+```{r}
+# count unique words in each statement
+stats_clean$n_unique <-
+  ntype(stats_clean$statement,
+        remove_punct = TRUE)
+
+# calculate proportion of unique words in each statment
+stats_clean <-
+  stats_clean %>%
+  mutate(n_uniq_prop = n_unique / n_words)
+
+# display result
+stats_clean %>%
+  select(stat_id,
+         n_unique,
+         n_uniq_prop,
+         statement)
+
+```
+
+
+## Save output
+
+Again, we can now save the cleaned output (as an R data object), for future import
+and use in subsequent analyses.
+
+
+```{r}
+# create object just with stat_id and newly created length variables
+stats_length <-
+  stats_clean %>%
+  select(stat_id,
+         n_words,
+         n_unique,
+         n_uniq_prop)
+
+# save that object
+save(stats_length,
+     file = "stats_length.Rda")
+
+# now remove stats_clean from global environment (to avoid later confusion)
+rm(stats_clean)
+
+```
+
+# Citations
+
+* DePaulo, B. M., Lindsay, J. J., Malone, B. E., Muhlenbruck, L., Charlton, K., 
+& Cooper, H. (2003). Cues to deception. Psychological Bulletin, 129(1), 74.
+
+# END

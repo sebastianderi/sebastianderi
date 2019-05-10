@@ -1,0 +1,349 @@
+---
+title: "Modeling (Overview)"
+output:
+  html_document:
+    df_print: paged
+    code_folding: show
+---
+
+[return to [overview page](./hld_OVERVIEW.html)]
+
+Before building any specific models, it's worth discussing what these models
+aim to do and how they will be assessed. This is what I discuss here.
+
+The models I will eventually create, will differ in a number of ways. But
+they will also share some core similarities, allowing for comparison
+between them. All of these models will take some set of features (e.g.
+sentiment, statement readability) and use those features to make a binary
+prediction about the truth or falsity of individual statements. In practice,
+for each model, this will entail dividing up the the full set of statements
+up into two groups: training and test. For example, in one model we may
+take 75% of the statements and use them to train a model to predict
+truths and lies based on the lengths of statements. The remaining 25% of
+the statements will be used to evaluate the model. That is, we will use the
+model to generate a prediction for each of the statements in the test set.
+Once this is done, we can assess the performance of that model in a number of
+ways. I now discuss some of the primary metrics we can use to assess
+model performance. An important (and I believe interesting) fact to take note
+of is that all the following metrics can be used to describe both our model's
+performance at lie detection and human performance in lie detection. In fact,
+I think trying to interpret each metric as a measure of human
+performance helps add a layer of understanding and meaning to each of the
+metrics that will be discussed.
+
+(Further, it should be noted that all of the performance metrics that I will
+describe are metrics used to assess performance of classification models;
+that is models that try to predict the class or group into which a set of
+samples belong, for example whether someone is likely to default on a
+loan or not based on a set of predictive features which may be either
+continuous or categorical. This is in contract to the other major category of
+predictive models, which aim to make predictions of numeric outcomes, 
+such as a person's future earnings based on their educational experience
+and standardized test scores.)
+
+
+# Overall Accuracy
+
+First, and most obviously, the easiest and most central way that each model
+will be assessed, will be by it's overall accuracy. That is, we count up
+the number of lies correctly predicted as lies and the number of truths
+correctly predicted as truths, and then divide them by the total number of
+statements we generated a prediction for. This is overall accuracy.
+
+I will try to summarize various performance metrics that I review
+visually. In order to do that, I need to generate some example data,
+which I now do below. This example data will take the form of
+an imaginary set of 100 statements, 50 of which are truths, and 50 of which
+are lies. And for each statement, we have generated a prediction as to
+whether that statement is a truth or a lie.
+
+
+# Packages
+
+First, I wil start by loading some packages that will be used in this section.
+
+```{r, message=FALSE, warning=FALSE}
+# before knitting: message = FALSE, warning = FALSE
+library(tidyverse) # cleaning and visualization
+library(ggthemes) # visualization
+
+```
+
+# Generate Example Data
+
+And next, I will generate some example data.
+
+```{r}
+# make matrix of the right shape
+example <-
+  matrix(ncol = 4,
+         nrow = 10 * 10)
+
+# name columns
+colnames(example) <- c("x_cord", "y_cord", "Reality", "Prediction")
+
+# convert to data frame
+example <- data.frame(example)
+
+# fill in values
+counter = 0
+for (y in 1:10){
+  for (x in 1:10) {
+    counter = counter + 1
+    example[counter, 1] <- x
+    example[counter, 2] <- y
+    if (y <= 5) {
+      if (x <= 8) {
+        example[counter, 3:4] <- c("Truth", "Truth")
+      } else if (x > 8) {
+        example[counter, 3:4] <- c("Truth", "Lie")
+      }
+    } else if (y > 5) {
+      if (x <= 6) {
+        example[counter, 3:4] <- c("Lie", "Lie")
+      } else if (x > 6) {
+        example[counter, 3:4] <- c("Lie", "Truth")
+      }
+    }
+  }
+}
+
+# make variable to denote correct and incorrect responses
+example <-
+  example %>%
+  mutate(correct = case_when(Reality == Prediction ~ "Correct",
+                             Reality != Prediction ~ "Incorrect"))
+
+# print resulting df (turned off for knitting)
+# example
+```
+
+
+# Confusion Matrix
+
+Various central performance metrics which I will now describe are derived from an important
+table often used to summarize predictive performance in binary classification.
+This table is called a "confusion matrix" and is a 2x2 table that cross-tabulates
+predictions and actual outcomes (what I refer to as reality). The canonical
+form of this table is shown below. I will present a visual analog to this table
+as I go through the performance metrics on the example data.
+
+
+Reality (horizontal) | Reality = True | Reality = False
+---------------------- | ---------------------- | ----------------------
+Predictions (vertical) | ---------------------- | ----------------------
+Prediction = True | # True Positives | # False Positive
+Prediction = False | # False Negatives | # True Negatives
+
+
+# Overall Accuracy
+
+Now, we can visualize overall accuracy in the chart below. In this chart,
+we see the colored boxes represent the underlying truth of each statement
+(green boxes are truthful statements, and red boxes are lies). The colorized
+circle represent predictions (green circles represent statements predicted
+to be truthful, and red circles represent statements predicted to be lies).
+Further, each statement is numbered and an X is placed through it if the
+prediction was incorrect, and a plus-sign is placed through it if the
+prediction was correct.
+
+Thus, here overall accuracy is the sum of all the boxes with a plus sign
+demarcation divided by the total number of boxes. Here that gives us 70%
+overall accuracy.
+
+
+Mathematically, overall accuracy is: (#true positives + #true negatives) / 
+(#true positives + #true negatives + #false positivess + #false negatives).
+
+```{r, fig.width=8, fig.height=5}
+# make plot
+pred_plot <-
+ggplot(data = example,
+       aes(x = x_cord,
+           y = y_cord)) +
+  geom_point(aes(color = Reality),
+             shape = 15, # full square
+             size = 11) +
+  scale_color_manual(values = c("#de2d26", "#2ca25f")) + # set custom color colors 
+  geom_point(aes(fill = Prediction),
+             shape = 21, # outlined circle
+             color = "transparent",
+             size = 5) +
+  scale_fill_manual(values = c("#930000", "#276b1c")) + # set custom fill colors
+  geom_point(aes(shape = correct),
+             size = 11,
+             color = "white",
+             position = position_nudge(x = 0, y = -0)) + # x = 0.1, y = -0.2
+  scale_shape_manual(values = c(3, 4)) + # set custom shape shapes
+  geom_text(aes(label = 1:100),
+            size = 3,
+            hjust = 1,
+            vjust = -0.5,
+            color = "white") +
+  labs(title = "Reality v. Predictions",
+       y = "",
+       x = "") +
+  scale_y_continuous(breaks = seq(from = 10, to = 0, by = -1),
+                     trans = "reverse") +
+  scale_x_continuous(breaks = seq(from = 0, to = 10, by = 1),
+                     position = "top") +
+  guides(color = guide_legend(order = 1),
+         fill = guide_legend(order = 2),
+         shape = guide_legend(order = 3,
+                              title = NULL,
+                              label = FALSE)) +
+  theme(plot.title = element_text(hjust = 0.5),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.text.x=element_blank(),
+        axis.ticks.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank(),
+        legend.key = element_rect(color = "transparent", fill = "transparent"),
+        legend.position = "right",
+        legend.title.align = 0.5,
+        legend.box.margin=margin(t = 0, b = 0, r = 10, l = 0))
+
+# print plot (with overall accuracy highlighted)
+pred_plot
+
+```
+
+# Sensitivity ("Truth Detection Rate")
+
+Another useful meric by which classification models are assessed is sensitivity
+(also called "recall"). In binary classification, we are usually trying to
+detect some particular outcome. Sensitivity is the percent of all "positive" outcomes
+that we actually detect. Here is an example. When we put our luggage through the 
+x-ray machine at the airport, we can imagine that the machine is trying to
+detect whether our luggage has a gun in it or not. Sensitivity is the percent of
+all guns in suitcases that the x-ray machine actually finds. Such a machine could
+have very good overall accuracy simply by guessing that no one has a gun in their
+suitcase -- because the vast majority of people don't have guns in their suitcases.
+However, such a model would have poor sensitivity (in fact 0% sensitivity) because
+it would detect 0% of the suitcases that do have guns in them. In our case, what
+sensitivity means depends on how exactly we define our task. If our task is "truth
+detection" (that is, finding true statements), then sensitivity is the percent 
+of all true statements that we identify as true. (In the figure, the percent of 
+green boxes with a green circle in them, i.e. 80% here.)
+However, if we consider our task pure "lie detection", then sensitivity would be
+the percent of all lies that we correctly identify as lies (red boxes with a 
+red dot in them). Unless stated otherwise,
+in this report, sensitivity will correspond to a task of "truth detection".
+Thus, in this particular case, we can think of sensitivity as the "truth
+detection rate" -- the percent of all true statements that we correctly identify as true.
+
+Mathematically, sensitivity is: (#true positives) / (#true positives + #false negatives).
+
+```{r, fig.width=8, fig.height=5}
+pred_plot
+```
+
+
+# Specificity ("Lie Detection Rate")
+
+Specificity is the other side of the coin, in a sense, of sensitivity.
+Specificity is the percent of all "negative" cases that a model correctly identifies.
+To continue with the X-ray machine example from above (where the task is "gun detection"),
+specificity is the percent of all suitcases that do not have a gun, which we
+correctly identified as not having a gun. Again, if we turn off the X-ray
+machine and simply predict that no one has a gun, this "model" would have
+great (in fact, perfect, 100%) specificity. (Of course, to the detriment
+of sensitivity. Without perfect information, there is a tradeoff
+between sensitivity and specificity. We are always between the extremes
+of being overbroad and identifying everything as a positive case, thus achieving
+high sensitivity at the cost of low specificity, or being overly conservative erring on
+the side of not identifying anything as a positive case, thus achieving high specificity
+at the expensive of low sensitivity.) In our case, if our task is "truth detection"
+(identifying true statements), then specificity is the proportion of all lies
+that we correctly identify as lies. This case be considered the "lie detection
+rate" in our case. In the figure below, this would be the 60% (the red boxes with
+a red dot, divided by all the red boxes).
+
+Mathematically, specificity is: (#true negatives) / (#true negatives + #false positives).
+
+
+```{r}
+pred_plot
+```
+
+# Precision ("Non-Gullibility")
+
+In a sense, the previous metrics focused on outcomes. That is, we looked at metrics
+that assessed how well our model could identity positive cases (sensitivity, e.g. "truths")
+or how well our model could identify negative cases (specificity, e.g. "lies").
+These next two metrics are more focused on predictions. The first such metric I will
+explain is "precision" (also called positive predictive value). Most simply,
+this can be thought of as the percent of times that a model is correct
+when it predicts a "positive outcome". To continue with the x-ray machine example,
+it is the percentage of times that, after the machine beeps (predicts a suitcase
+has a gun), that suitcase actually has a gun. In our case, assuming our task is
+"truth detection", it is the percent of the time that a statement is true given
+that we've predicted the statement is true. It can be thought of a metric of
+non-gullibility. If someone is not gullible, then they have high precision (a large
+proportion of the statements they predict to be true are in fact true). In the
+figure below, precision, is the proportion of green circles that also have a
+green square behind them (66.7%).
+
+Mathematically, precision is: (#true positives) / (#true positives + #false positives).
+
+```{r}
+pred_plot
+```
+
+
+# Negative Predictive Value ("Well-Founded Skepticism")
+
+Again, there is another side of the coin to the precision metric, as there
+was for the sensitivity metric. Negative predictive value is, in a sense,
+the other side of the coin of precision. It measures of the percent of
+cases that are labeled as "negative" which are true negatives. In the x-ray example,
+it is the proportion of times when a suitcase does not set off the machine's alarm
+that the suitcase actually does not have a gun in it. In our case, 
+assuming again our task is "truth detection", negative predictive value is the proportion
+of statements that we predict to be lies which are actually lies. Negative predictive
+value can be thought of as "well-founded skepticism" in our case. If someone is high
+in well-founded skepticism (negative predictive value), a large portion of the
+statements they believe to be lies turn out in fact to be lies. In the figure
+below, negative predictive value is the proportion of red circles that also
+have a red square behind them (75%).
+
+Mathematically, negative predictive value is: (#true negatives) / (#true negatives + #false negatives).
+
+```{r}
+pred_plot
+```
+
+
+# Other metrics
+
+There are a host of other important metrics and tools to assess classification performance,
+which I will not discuss for the time being -- but are nevertheless useful and 
+provide insight into a model's performance. Lest I fail to mention them entirely,
+these include:
+
+* Kappa
+* F1 scores
+* ROC curves
+* AUC (area under the curve)
+* Calibration Plots
+
+# Citations
+
+These are some very useful resources to understanding some of the ways that
+classification performance can be assessed.
+
+* Sensitivity and specificity. (2018). In Wikipedia.
+Retrieved from https://en.wikipedia.org/w/index.php?title=Sensitivity_and_specificity&oldid=868941362
+
+* Confusion matrix. (2018). In Wikipedia.
+Retrieved from https://en.wikipedia.org/w/index.php?title=Confusion_matrix&oldid=865598510
+
+* Kuhn, M., & Johnson, K. (2013). Applied predictive modeling (Vol. 26). Springer. (Chapter 11:
+Measuring Performance in Clasification Models)
+
+
+# END
+

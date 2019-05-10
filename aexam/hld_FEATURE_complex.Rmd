@@ -1,0 +1,436 @@
+---
+title: "Feature Extraction (Complexity)"
+output:
+  html_document:
+    df_print: paged
+    code_folding: show
+---
+
+[return to [overview page](./hld_OVERVIEW.html)]
+
+The feature I am now going to extract is some proxy for each statement's
+readability or linguistic complexity. This is another textual feature which
+may give us some clue about whether a person is lying or not. Vrij, Fisher, 
+Mann, & Leal (2006) marshal convincing evidence that lying is mentally taxing 
+(results in greater "cognitive load"). For example, 
+participants in mock interrogations indeed report that lying is more mentally 
+taxing than telling the truth; lying is also associated with greater activation 
+of "executive control" areas of the brain, like the prefrontal cortex. 
+As a result of this mental strain placed on liars, lying might be 
+accompanied by speech this simpler and less complex. 
+Indeed, Newman, Pennebaker, Berry, & Richards (2003) present evidence 
+that when lying, people use fewer "exclusive words" (e.g. but, except) -- which 
+they take to indicate that people are speaking in less sophisticated ways (e.g. 
+making less nuanced, qualified points, that often accompany exclusive words like 
+"but" and "except"). Pérez-Rosas & Mihalcea (2015) also find that various metrics 
+for quantifying the complexity of a piece of text are useful for predicting 
+whether a statement is a truth or a lie. Thus, we will extract this feature 
+from our statements.
+
+# Packages
+
+Again, I will start by loading relevant packages.
+
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse) # cleaning and visualization
+library(quanteda) # text analysis
+library(ggthemes)
+```
+
+# Load Data
+
+I will load the most recent version of the cleaned statements, which comes from 
+[Feature Extraction](./hld_FEATURE_overview.html).  
+(Note, we created a more recent object, recording the sentiment of
+each statement. However, we will not be using that object right now.)
+
+```{r}
+# this loads: stats_clean (a data-frame of out cleaned statements)
+load("stats_clean.Rda")
+
+```
+
+
+# Readability
+
+There are various methods that attempt to quantify the extent to which a piece
+of text is easily "readable". One category of methods tries to measure the
+complexity of the the "content" of the text (e.g. complexity of words used).
+Another category of methods focuses on visual features of the text
+(Readability, 2018, from Wikipedia). Obviously, here we are not concerned
+with the visual ease of reading text. And thus I will focus on the
+former types of readability. Specifically, I will extract the following two
+popular and fairly crude readability metrics.
+
+* Flesch Reading Ease
+* Gunning Fog Index
+
+These assign a numeric score to pieces of text, based on simple text statistics
+that aim to approximate the extent to which a text is difficult to read.
+
+## Flesch Reading Ease
+
+The Flesch reading ease metric was developed in 1975, by a U.S. Navy contractor, and
+assigns a readability score to a piece of text based on a formula (explained below);
+that readability score can then be translated to a school "grade level", to
+which the writing roughly corresponds (Flesch-Kincaid readability tests, 2018).
+
+### Formula
+
+The formula used to compute this metric is shown below. (The formula and table
+below are taken directly from Wikipedia (Flesch-Kincaid readability tests, 2018)).
+As we can see, essentially the formula assumes a piece of text is more complex
+if it has more words per sentence and more syllables per word (the rest is just
+weighting and adjustment).
+
+![](./pics/flesch_formula.png)
+
+### Baselines
+
+And here is a table showing various Flesch readability scores and the grade
+level those scores are supposed to correspond to. Higher scores
+indicate more readability (note that scores can go above or below the values
+presented in the table).
+
+Score	| Grade Level	| Description
+-------- | ----------------- | --------------------------------------------------------
+100.00-90.00	| 5th grade	| Very easy to read. Easily understood by an average 11-year-old student.
+90.0-80.0	| 6th grade |	Easy to read. Conversational English for consumers.
+80.0-70.0	| 7th grade	| Fairly easy to read.
+70.0-60.0	| 8th & 9th grade	| Plain English. Easily understood by 13- to 15-year-old students.
+60.0-50.0	| 10th to 12th grade |	Fairly difficult to read.
+50.0-30.0	| College	| Difficult to read.
+30.0-0.0	| College graduate |	Very difficult to read. Best understood by university graduates.
+
+According to Flesch-Kincaid readability tests (2018), here are the empirical
+readability scores of various publications.
+
+Publication | Score
+------------- | -------
+Reader's Digest | 65
+Time Magazine | 52
+Harvard Law Review | "low 30s"
+
+## Gunning Fog Index
+
+The Gunning Fog Index is another very simple and similar formula for 
+computing readability, created in 1952, by Robert Gunning, who worked
+in newspaper and textbook publishing (Gunning fog index, 2018).
+This index tries to directly compute a "grade level" for the writing.
+
+### Formula
+
+As we can see, the Gunning Fog Index formula is very similar to the
+Flesch-Kincaid formula, except the numerator in the second
+term is "complex words" rather than syllables (and trivially, the coefficients
+and their sign).
+- although note the designation of "complex words" is still based on a 
+syllabic count (words with 3 or more syllables are complex). (Again, the formula 
+and table below are taken directly from Wikipedia 
+(Flesch-Kincaid readability tests, 2018)))
+
+![](./pics/gunning_fog_formula.png)
+
+### Baselines
+
+And this table shows how Gunning Fog scores are supposed to map on to grade level.
+
+
+Score |	Grade Level
+----- | ---------------------
+17 | College graduate
+16 | College senior
+15 | College junior
+14 | College sophomore
+13 | College freshman
+12 | High school senior
+11 | High school junior
+10 | High school sophomore
+9	| High school freshman
+8	| Eighth grade
+7	| Seventh grade
+6	| Sixth grade
+
+## Extracting Readability Scores
+
+Now let's go about extracting readability scores from actual text.
+Again, the quanteda package has a function, textstat_readabiliy(), that makes 
+the extraction of these readabilty scores very easy.
+
+### Example
+
+As usual, let's start with a simple example. We will use two statements,
+one that is complex and low on readability, and another that is simple
+and high on readability.
+
+* "The deteriorating octogenarian somnambulated, meandering clumsily about his condominium.
+Disoriented the disheleved derelict perenigrated tortoislike toward the unprepossessing lavatory facility."
+* "The old guy walked in his sleep. He made his way to the toilet."
+
+```{r}
+# Generate sentences
+example_1 <- c("The deteriorating octogenarian somnambulated, meandering clumsily about his condominium. Disoriented the disheleved derelict perenigrated tortoislike toward the unprepossessing lavatory facility.")
+example_2 <- c("The old guy walked in his sleep. He made his way to the toilet.")
+
+# Store to data frame
+example_df <-
+  data.frame(statement = c(example_1, example_2),
+             stat_num = c(1, 2)) %>%
+  mutate(statement = as.character(statement))
+
+# Print Sentences
+example_df
+
+```
+
+### Example (Flesch-Kincaid)
+
+And now let's compute the Flesch-Kincaid
+score for each sentence. As we can see, the simple sentence gets a high score (109),
+while the complex sentence gets an extremely low score (-103). (The fact that
+I was able to come up with a sentence that scores below 0 constitutes
+proof that I am a graduate student. Not to be outdone, a sentence from Proust's
+Swann's Way scores a -515, (Flesch-Kincaid readability tests, 2018)).
+
+
+```{r}
+# Compute Flesch readability score for each sentence
+for (i in 1:nrow(example_df)){
+  example_df$read_FLESCH[i] <- textstat_readability(x = example_df$statement[i],
+                     measure = "Flesch")$Flesch
+}
+
+# Print result
+example_df %>%
+  select(stat_num,
+         read_FLESCH,
+         statement)
+
+```
+
+### Example (Gunning Fog)
+
+And now let's compute the Gunning Fog Index for each of these statements.
+(Here higher numbers indicate higher "grade levels", i.e. lower
+readability.) As we can see, the simple sentence gets a low score (2.8), and the
+complex sentence gets a high score (32, suggesting the writer is in the 32nd
+grade, which if I stay around Cornell any longer, will not be too far off).
+
+```{r}
+# Compute Gunning Fog score for each sentence
+for (i in 1:nrow(example_df)){
+  example_df$read_FOG[i] <- textstat_readability(x = example_df$statement[i],
+                     measure = "FOG")$FOG
+}
+
+# Print result
+example_df %>%
+  select(stat_num,
+         read_FOG,
+         read_FLESCH,
+         statement)
+```
+
+### Full Dataset
+
+And now let's apply this to our full set of 5,004 statements, computing 
+Flesch-Kincaid and and Gunning Fog scores for each statement.
+
+```{r}
+# Compute Flesch and Gunning-Fog column for all statements
+stats_clean$read_FLESCH <-
+  textstat_readability(x = stats_clean$statement,
+                       measure = "Flesch")$Flesch
+
+stats_clean$read_FOG <-
+  textstat_readability(x = stats_clean$statement,
+                         measure = "FOG")$FOG
+
+
+# Print result data frame
+stats_clean %>%
+  select(stat_id,
+         read_FLESCH,
+         read_FOG,
+         statement)
+```
+
+
+# Examine Resulting Reability Scores
+
+Now let's do a quick examination of the resultant scores.
+
+## Association between Flesch-Kincaid and Gunning Fog
+
+First, let's visually examine how closely associated the two metrics are.
+Indeed, we see that the scores are very tightly correlated (this may lead to
+multicollinearity problems in later phases. Thus, we will have to address this,
+and other multicollinearity problems at some point.)
+
+```{r}
+ggplot(data = stats_clean,
+       aes(x = read_FOG,
+           y = read_FLESCH)) +
+  geom_point(alpha = 0.1) +
+  theme_solarized() +
+  labs(title = "Scatterplot: Flesch Readability Score v. Gunning Fog Index",
+       x = "Gunning Fog Score",
+       y = "Flesch Readability Score") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+## Correlation between Flesch-Kincaid and Gunning Fog
+
+Indeed if we compute the correlation coefficients betweent the two
+metrics, they're astronomically high: - 0.95 (pearson), -0.87 (spearman-rank).
+
+
+```{r}
+data.frame(correlation = c(
+  cor(x = stats_clean$read_FOG,
+    y = stats_clean$read_FLESCH,
+    method = "pearson"),
+  cor(x = stats_clean$read_FOG,
+    y = stats_clean$read_FLESCH,
+    method = "spearman")),
+  type = c("pearson", "spearman"))
+```
+
+
+## Most Readable Statements
+
+Now let's examine how readability scores correspond with actual
+statements. Let's look at the most readable sentences first (as measured by Flesch
+score, although results are likely to be highly similar for Gunning Fog given
+associations just noted). The main thing that seems apparent here is that
+the most readable statements have short sentences (i.e. few words per sentence),
+which makes sense given that this is literally a term used in computing
+the Flesch readability score.
+
+```{r}
+stats_clean %>%
+  select(read_FLESCH,
+         statement) %>%
+  arrange(desc(read_FLESCH))
+
+
+```
+
+## Least Readable Statements
+
+And now let's look at those sentences scored as least readable. Here, we see
+the opposite from what we see above. The sentences that are scored as not very readable
+are those that have many words per sentence.
+
+```{r}
+stats_clean %>%
+  select(read_FLESCH,
+         statement) %>%
+  arrange(read_FLESCH)
+```
+
+## Summary Statistics
+
+And let's look at some summary statistics (in particular the median and
+the 5th, 10th, 25th, 75th, 90th, and 95th percentiles). As we can see,
+the median Flesch score is a 40, which is pretty low (not very readable).
+And the median Gunning Fog score is around 23.5, which is high (not very
+readable).
+
+```{r}
+stats_clean %>%
+  gather(key = "readability_type",
+         value = "score",
+         read_FLESCH, read_FOG) %>%
+  group_by(readability_type) %>%
+  summarise(median = median(score),
+         percentile_5 = quantile(score, probs = c(0.05)),
+         percentile_10 = quantile(score, probs = c(0.10)),
+         percentile_25 = quantile(score, probs = c(0.25)),
+         percentile_75 = quantile(score, probs = c(0.75)),
+         percentile_90 = quantile(score, probs = c(0.90)),
+         percentile_95 = quantile(score, probs = c(0.95)))
+
+```
+
+## Distribution of Readability Scores Across Questions
+
+And finally let's look at the distribution of readability scores for each of
+the six questions, for the two readability types. (Again, some extreme values 
+have been left off for the sake of easier visualization.) None of the
+distributions for the individual questions look wildly different.
+
+```{r, fig.width = 9, fig.height=10}
+# note: you can adjust the output figure width and height in RMarkdown!
+# https://stackoverflow.com/questions/39634520/specify-height-and-width-of-ggplot-graph-in-rmarkdown-knitr-output
+stats_clean %>%
+  filter(read_FLESCH > -20,
+         read_FLESCH < 75,
+         read_FOG > 5,
+         read_FOG < 50) %>%
+  gather(key = "readability_type",
+         value = "score",
+         read_FLESCH, read_FOG) %>%
+  mutate(q_num = factor(q_num,
+                        labels = c("Q1 (Meeting)",
+                                   "Q2 (Regret) ",
+                                   "Q3 (Yesterday)",
+                                   "Q4 (Liking)",
+                                   "Q5 (Strength)",
+                                   "Q6 (Hobby)"))) %>%
+  ggplot(aes(x = score,
+             fill = readability_type)) +
+  geom_histogram(alpha = 0.85) +
+  facet_grid(q_num ~ readability_type,
+             scales = "free")
+
+```
+
+
+
+# Save
+
+And finally let's save the data object we just created.
+
+```{r}
+# create object that links stat_id to complexity metrics
+stats_complex <-
+  stats_clean %>%
+  select(stat_id,
+         read_FLESCH,
+         read_FOG)
+  
+# save
+save(stats_complex,
+     file = "stats_complex.Rda")
+  
+# remove stats_clean from global environment
+rm(stats_clean)
+
+```
+
+
+# CITATIONS
+
+* flesch-kincaid: Flesch-Kincaid readability tests. (2018). In Wikipedia. 
+Retrieved from https://en.wikipedia.org/wiki/Flesch%E2%80%93Kincaid_readability_tests
+
+* gunning-fog: Gunning fog index. (2018). In Wikipedia. Retrieved from https://en.wikipedia.org/w/index.php?title=Gunning_fog_index
+
+* Newman, M. L., Pennebaker, J. W., Berry, D. S., & Richards, J. M. (2003). 
+Lying words: Predicting deception from linguistic styles. Personality and 
+social psychology bulletin, 29(5), 665-675.
+
+* Pérez-Rosas, V., & Mihalcea, R. (2015). Experiments in open domain deception 
+detection. Proceedings of the 2015 Conference on Empirical Methods in Natural 
+Language Processing, 1120-1125.
+
+* readability: Readability. (2018). In Wikipedia. Retrieved from https://en.wikipedia.org/w/index.php?title=Readability&oldid=866173421
+
+* Vrij, A., Fisher, R., Mann, S., & Leal, S. (2006). Detecting deception by 
+manipulating cognitive load. Trends in Cognitive Sciences, 10(4), 141-142.
+
+
+
+# END

@@ -1,0 +1,278 @@
+---
+title: "Data Cleaning & Pre-Processing"
+output:
+  html_document:
+    df_print: paged
+    code_folding: show
+---
+
+[return to [overview page](./hld_OVERVIEW.html)]
+
+Before beginning attempting to build models to predict the truth
+or falsity of statements, we need to do some house-keeping. We need to join together,
+examine, pre-process and clean the sets of features we created in the earlier sections.
+That is what I do in this section.
+
+# Packages
+
+Again, I will start by loading relevant packages.
+
+```{r, message=FALSE, warning=FALSE}
+# before knitting: message = FALSE, warning = FALSE
+library(tidyverse) # cleaning and visualization
+library(plyr) # has join_all function
+library(ggthemes) # visualization
+library(caret) # modeling
+library(AppliedPredictiveModeling)
+library(e1071) # has skewness() function
+library(DescTools) # has Winsorize() function
+```
+
+# Load Data
+
+First, I will load the various data from the features we just extracted.
+
+```{r}
+# load all the nice tidy df's of features we created (remember stats_words has multiple dtm's)
+load("stats_clean.Rda") # has text of statement
+load("stats_length.Rda") # statement lengths
+load("stats_pos.Rda") # parts of speech
+load("stats_sent.Rda") # sentiment
+load("stats_complex.Rda") # complexity and readability
+load("stats_words.Rda") # bag of words (mini document-term matrices)
+
+```
+
+
+# Join Together All Data
+
+To begin, let's take all the feature sets we created (statement length,
+parts of speech, sentiment, readability, and word frequency) and put them 
+together. We can join together these different feature sets by linking individual
+statements together by their individual statement identification number ("stat_id" column),
+which we made sure to attach and keep constant throughout the feature extraction process.
+(This can be done easily using SQL-style join functions available through various
+R packages, particuly in the tidyverse. For background on SQL joins, which are 
+a super useful and universal theme in data management: Join (SQL), 2018.)
+
+```{r}
+# join all features with ground truth, by stat_id
+stats_all <-
+  join_all(dfs = list(stats_length,
+                      stats_pos,
+                      stats_sent,
+                      stats_complex,
+                      stats_dtm_25),
+           by = "stat_id",
+           type = "left") %>%
+  left_join(stats_clean %>%
+              select(stat_id,
+                     grd_truth),
+            by = "stat_id") %>%
+  select(stat_id,
+         grd_truth,
+         everything())
+
+
+# print joined df
+stats_all
+
+```
+
+# Transforming Data
+
+Next, I will transform the data to ease interpretation and allow for better comparison
+in later analyses. Specifically, I am going to center and
+rescale all predictor variables (i.e. features we previously extracted). First,
+I will center all variables around their mean -- i.e. for each variable, compute its
+mean and then subtract that value from each row. In this way, we will know that any
+value which approaches zero will be the near the mean for that variable. Second, I 
+will rescale each variable by its standard deviation -- i.e. divide the values in 
+each column by the standard deviation of that column, so that deviations between 
+variables are comparable. Thus, for any variable, a value like 0.5 will 
+mean the same thing -- that value is 0.5 standard deviations above the mean for 
+that feature. Luckily, the preProcess function in the caret package (Kuhn, 2008) 
+makes this extremely easy.
+
+```{r}
+# center and scale with preProcess and predict from caret
+stats_allclean <- 
+  predict(newdata = stats_all,
+          preProcess(x = subset(stats_all,
+                                select = -c(stat_id, grd_truth)),
+                     method = c("center", "scale")))
+
+# print centered and scales data frame
+stats_allclean
+
+```
+
+
+# Cleaning Data
+
+Before engaging in any predictive modeling, it's important to make sure that
+there are no major underlying problems in that data. As Kuhn & Johnson (2013, p. 27) 
+note "data preparation can make or break a model's predictive ability". They 
+outline a few key issues to check for when cleaning or pre-processing data.
+The ones that are particular relevant to use are
+
+* skew in predictors
+* collinearity among predictors
+* zero or near zero variance in predictors
+
+I am going to check for each of these problems and adjust (i.e. delete or transform)
+data in cases where any major problems seem to arise. Later, when we actually build
+predictive models, we can compare the performance of models that use this cleaned 
+data compared to models that use the raw data.
+
+
+## Skew (Visualizing)
+
+Let's start by visualizing the distributions of all the variables. As we can see
+when we do this, there is a fair deal of skew in our data. This outlying points
+may exert a high degree of influence on some of our model's estimates and thus 
+
+
+```{r hists, fig.width = 10, fig.height=10}
+stats_allclean %>%
+  select(-stat_id) %>%
+  keep(is.numeric) %>% 
+  gather() %>% 
+  ggplot(aes(value)) +
+    facet_wrap(~ key, scales = "free") +
+    geom_histogram()
+```
+
+## Skew (Eliminating)
+
+Kuhn & Johnson, (2013) suggest a fair number of popular ways of dealing with 
+skewed data. One common solution 
+
+```{r}
+skewness(stats_all$pos_INTJ)
+
+as.data.frame(
+  lapply(subset(stats_all, select = -c(stat_id, grd_truth)),
+         e1071::skewness)) %>%
+  gather(key = "feature",
+         value = "skew") %>%
+  arrange(desc(skew))
+```
+
+
+```{r}
+
+stats_all$n_words2 <- 
+  Winsorize(stats_all$n_words,
+            probs = c(0.01, 0.99))
+
+stats_all %>%
+  select(n_words,
+         n_words2) %>%
+  gather() %>% 
+  ggplot(aes(value)) +
+    facet_wrap(~ key, scales = "free") +
+    geom_histogram()
+```
+
+```{r}
+stats_all$wrd_ME2 <- 
+  Winsorize(stats_all$wrd_ME,
+            probs = c(0.01, 0.99))
+
+stats_all %>%
+  select(wrd_ME,
+         wrd_ME2) %>%
+  gather() %>% 
+  ggplot(aes(value)) +
+    facet_wrap(~ key, scales = "free") +
+    geom_histogram()
+
+```
+
+
+
+
+```{r}
+skewness(stats_all$n_words2)
+```
+
+
+## Collinearity (Visualizing)
+
+A problem that might affect models like logistic regression is collinearity. A
+high degree of correlation between our variables may lead to unstable and unreliable
+estimates. Kuhn & Johnson, (2013, p. ) suggest an algorithm for diagnosing and 
+eliminating problems of collinearity.
+
+```{r}
+# select only predictor variables (i.e. get rid of stat_id and grd_truth columns)
+stats_allclean_x <- subset(stats_allclean,
+                           select = -c(stat_id, grd_truth))
+
+
+# find high correlations
+high_corr_indices <- findCorrelation(x = cor(stats_allclean_x),
+                                     cutoff = 0.75)
+
+# find names of those columns with high correlations
+high_corr_names <- names(stats_allclean_x)[high_corr_indices]
+                        
+
+# eliminate high correlation columns from cleaned dataset
+stats_allclean <-
+  stats_allclean %>%
+  select(-high_corr_names)
+```
+
+## Zero or Near Zero Variance
+
+```{r}
+nearZeroVar(stats_all)
+```
+
+
+
+
+```{r}
+cor(stats_all[, 16:22])
+```
+
+
+```{r}
+cor(
+  stats_all[, 
+            -which(
+              names(stats_all) 
+              %in% c("stat_id", "grd_truth")
+              )])
+```
+
+
+# Dimension Reduction
+
+
+
+# Save
+
+```{r}
+# save the raw and various cleaned data objects
+save(stats_all,
+     file = "stats_all.Rda")
+
+```
+
+
+Now, let's save the various objects created.
+
+# Citations
+
+* Join (SQL). (2018). In Wikipedia. 
+Retrieved from https://en.wikipedia.org/w/index.php?title=Join_(SQL)&oldid=868927067
+
+* Kuhn, M. (2008). Building predictive models in R using the caret package. 
+Journal of Statistical Software, 28(5), 1-26.
+
+* Kuhn, M., & Johnson, K. (2013). Applied predictive modeling (Vol. 26). Springer.
+
+# END

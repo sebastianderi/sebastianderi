@@ -1,0 +1,244 @@
+---
+title: "Data Generation"
+author: Sebastian Deri
+output:
+  html_document:
+    df_print: paged
+---
+
+[return to [overview page](./hld_OVERVIEW.html)]
+
+If our goal is to compare human, computer, and hybrid lie detection, we must
+have a corpus of statements on which human, computer, and hybrid lie detection
+performance can be assessed. To this end, I generated (through "crowd-sourcing")
+such a corpus of statements. Further, this corpus is designed to overcome
+certain weaknesses in the corpuses used in some of the previous text-based
+lie-detection analyses. In this section, I describe in detail how I 
+generated this corpus of statements.
+
+## General Approach
+
+There are two major ways of collecting text-based statements for lie detection:
+
+* open-endedly asking people to write statements that are true and false
+* having people respond to specific questions or prompts with true and false answers
+
+While some studies have used the former method (e.g. Pérez-Rosas & Mihalcea, 2015),
+these often result in low quality statements and introduce extraneous 
+sources of variability between truths and lies. For example, here are some
+examples of open-ended lie statements from the Pérez-Rosas & Mihalcea, 2015
+dataset (which the authors make publicly available to their credit):
+
+* "Cranberry juice is yellow"
+* "I just won the lottery."
+* "I am outgoing."
+* "I climbed mount everest last year."
+
+And here are some examples of true statements from that same dataset:
+
+* "I have blue eyes."
+* "Our solar system is in the milky way galaxy."
+* "I like to watch tv."
+* "Rain falls from the sky."
+
+These statements are of low quality. And they may differ from each other in
+systematic ways that we do not intend (e.g. more of the lies may be about one's
+personal experiences). I sought to generate a dataset in which statements were
+of higher quality and left less room for unintended variability. Thus, I opted
+to collect statements which were either true or untrue responses to specific
+prompts.
+
+An example of a study that generated true and false statements by asking people
+to respond either honestly or dishonestly to fixed questions comes from Klein &
+Epley (2015). Here are the prompts used in that study:
+
+![](./pics/epley_klein_lies.png)
+
+Another study that uses this method comes from Newman, Pennebaker, Berry, & 
+Richards (2003), who asked people to lie in several confined ways. Specifically,
+participants were asked to either lie or tell the truth about their opinion
+about a political issue (abortion), their opinion about about a friend (e.g.
+pretend they like someone they don't), or respond to an accusation (e.g. that
+they stole money).
+
+I sought to emulate the best features of these previous
+studies, which were able to more successfuly generate higher quality statements
+with less unintended variability.
+
+One might note that the statements in these prompt-based studies tend to have
+some similar characteristics. First, the prompts ask the participants to
+communicate information about themselves (e.g. their favorite class),
+rather than de-personalized or general facts about the world (e.g. the
+height of the Eiffel tower). Psychologically, this might be thought of asking
+participants to recall information stored in episodic (auto-biographic) memory
+rather than declarative memory. Further, these personally relevant statements
+can be intuitively grouped into some overarching categories:
+
+* true and false representations of one's opinions (e.g. favorite movie,
+opiion on a friend)
+* true and false representations of oneself (e.g. one's hobbies)
+* true and false representations of events that one might have experienced (e.g.
+whether someone actually stole money or not).
+
+I tried to collect an equal number of these three
+types of statements (opinion-based, self-representation-based, and event-based).
+These, in my mind, might roughly 
+correspond to some of the major categories of lying that people might engage in
+in the "real
+world": misrepresenting their opinions (e.g. their opinions and attitudes towards
+other), misrepresenting themselves (e.g. their skills during a job interview),
+or misrepresenting events (e.g. lying to a jury about where one was on the
+night of a suspected crime).
+
+
+## Participants
+
+Participants were recruited on Amazon's Mechanical Turk. They were paid $2.50
+for their time.
+
+The goal was to generate at least 5,000 total statements. Participants answered
+6 total questions. Once, they answered all six questions by lying. And once they
+answered those same six questions by telling the truth. (The order in which
+participants did this was randomized and recorded.) Thus, because each participant
+generates 12 statements total, at least 417 participants were needed
+(417 * 12 = 5004).
+
+Only those participants who generated both a true and false statement for each
+of the 6 prompts was included in the final dataset (to ensure no imbalanced
+participants were included who contributed more than one type of statement than
+another, or who only responded to certain questions.) Thus, recruiting
+continued until 417 participants were recruited who generated 12 full statements.
+This necessitated recruited 437 participants (i.e. 20 did not generate full
+responses and were dropped from the final dataset). 
+
+## Procedures and Materials
+
+I will now walk through the exact procedure by which participants were
+led to generate statements. I will go through the stimuli, in the order
+that participants went through them. Further, to clearly demonstrate how participants
+actually responded to the questions and stimuli, I picked one actual participant
+and show her actual responses at each stage of the experiment (who I will refer to
+as Jane, for the sake of exposition).
+
+## Prelimary Questions
+
+Before responding to the prompts, participants were asked to list the names or
+initials of someone they liked, someone they disliked, and someone they knew
+well. These specific people were then used in the prompts, explained below.
+Below, we can see the prompt and Jane's responses.
+
+### Prelimary Questions (Actual Responses)
+
+![](./pics/stim_1_people_FILL.png)
+
+## Explanation of Task
+
+Next, the general experiment was explained to participants. Note that participants
+were asked to generate lies that seem convincing and realistic. This was meant to avoid
+obviously untrue lies, as we saw in other datasets. The actual prompt is shown below.
+
+### Explanation of Task (Actual Prompt)
+
+![](./pics/stim_2_prompt.png)
+
+(The first bolded section includes a typo. It should of course say "six questions".)
+
+## Statements
+
+All participants were presented with the same set of six questions. Once, they
+were asked to go through all six questions and answer honestly. And once, they were
+asked to go through each statement and answer dishonestly. As mentioned earlier,
+the order in which they did this (truths then lies, or lies then truths) was
+randomized between participants. The order in which participants answered the
+six questions was kept constant in both conditions, and between participants.
+These questions, with Jane's actual response's, are shown below. (Note that
+participants also had to give responses that were at least 200 characters long,
+which they were told corresponded to about 3-5 sentences.)
+
+First, I will show her six truthful responses. (Note that for the first question,
+the name of the person she said she knows well, JaQuan, is piped in. And for the
+fourth question, the name of the person she said she liked, Isaiah, is piped in.)
+This will be followed by her six untruthful responses.
+
+### Statements (Actual Responses: Truthful Answers)
+
+![](./pics/stim_3t_prompt.png)
+
+![](./pics/stim_3t_first3_FILL.png)
+
+![](./pics/stim_3t_second3_FILL.png)
+
+### Statements (Actual Responses: Untruthful Answers)
+
+![](./pics/stim_3f_prompt.png)
+
+![](./pics/stim_3f_first3_FILL.png)
+
+![](./pics/stim_3f_second3_FILL.png)
+
+## Verbal Explanations of Lying Method
+
+After completing both the truths and lie generation task, participants
+were then asked to provide some additional information about how they generated
+the lies. Specifically, participants were asked to do two things. They were shown
+the actual text of lies they had written (and the prompt to which they were
+responding in each case), and they were asked to describe (in an open-ended text
+response) how they had generated each lie. After they had described their method
+in their own words for each of the 6 statements, they were shown their 6 statements
+again and asked to dichotomously categorize their lie into one that was either:
+mostly based on reality (e.g. some slight modification of a true fact or opinion)
+or mostly based on something that the participant fabricated (e.g. came up with
+themselves, perhaps in a the way one might make up a story.)
+
+Below are Jane's actual descriptions of how she came up with each lie, in her own
+words.
+
+### Verbal Explanations of Lying Method (Actual Responses)
+
+
+![](./pics/stim_4_explain_prompt.png)
+
+![](./pics/stim_4_explain_first2_FILL.png)
+
+![](./pics/stim_4_explain_second2_FILL.png)
+
+![](./pics/stim_4_explain_third2_FILL.png)
+
+## Forced Choice Categorizations
+
+After writing out in words how she came up with the each of her six lies,
+Jane made a binary decision about the basis of her lying method. The prompt
+for that binary decision and then each of here binary choices is shown below.
+
+### Forced Choice Categorizations (Actual Prompt)
+
+![](./pics/stim_5_basis.png)
+
+#### Forced Choice Categorizations (Actual Responses)
+
+![](./pics/stim_5_first2_FILL.png)
+
+![](./pics/stim_5_second2_FILL.png)
+
+![](./pics/stim_5_third2_FILL.png)
+
+## Demographics
+
+Finally, participants were asked to provide some basic demographic information
+(gender, age, ethnicity/race, their country of origin). With this participants
+were thanked for their participation and the study finished.
+
+
+## Citations
+
+* Klein, N., & Epley, N. (2015). Group discussion improves lie detection.
+Proceedings of the National Academy of Sciences, 201504048.
+
+* Newman, M. L., Pennebaker, J. W., Berry, D. S., & Richards, J. M. (2003).
+Lying words: Predicting deception from linguistic styles. Personality and 
+social psychology bulletin, 29(5), 665-675.
+
+* Pérez-Rosas, V., & Mihalcea, R. (2015). Experiments in open domain deception 
+detection. In Proceedings of the 2015 Conference on Empirical Methods in Natural 
+Language Processing (pp. 1120-1125).
+

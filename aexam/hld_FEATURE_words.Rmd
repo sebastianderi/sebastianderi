@@ -1,0 +1,481 @@
+---
+title: "Feature Extraction (Bag of Words)"
+output:
+  html_document:
+    df_print: paged
+    code_folding: show
+---
+
+[return to [overview page](./hld_OVERVIEW.html)]
+
+A surprising amount can be learned by simplying analyzing the individual 
+words in a statement. Several of the previous features we extracted (parts of
+speech, sentiment) were indeed inferred through analysis of individual words.
+We mapped, for example, from individual words onto emotions (e.g. "excited" -> 
+positive) and used this to infer the overall sentiment of a statement (by summing
+across the emotions associated with each word in a statement). Or, we mapped from
+individual words to parts of speech (e.g. "ate" -> verb). However, in each of these 
+applications, in a sense, we were loosing information, as we were mapping from granular, 
+individual words to larger categories (sentiment, parts of speech). Ultimately,
+a great deal of information lies in these words themselves. Extracting these 
+individual words will be the focus here. Sometimes, this is called a "bag of words" 
+approach, as we are simply counting up and examining the occurence of individual
+words, with no regard for things like their order (Bag-of-words model, 2019).
+
+In the previous sections, we extracted features that were based, at least somewhat, 
+on previous knowledge or theories (e.g. people may be more anxious when they 
+lie, so statement sentiment might be a useful feature to extract). In this case, 
+our approach is more atheoretical. We are simply assuming that words are a rich 
+source of data and as a result might provide predictive value for detecting lies. 
+This may allow us to discover associations that we might have predicted or had 
+any inkling of beforehand. Of course, there is the obvious (and well-justified)
+worry that this is just a means of dredging the data for some results -- and with 
+enough dredging we are bound to find something (Simmons, Nelson, & Simonsohn, 2011). 
+However, so long as we careful that these unpredicted associations are robust 
+and replicable, which will try to ensure through repeated out of sample prediction procedures,
+this offers an avenue by which we may greatly increase our predictive ability.
+
+Thus, in this final section, I will focus on extracting the feature central to
+a great deal of current social scientific text-analysis -- counts of individual word frequencies.
+More specifically, I will create the canonical data object used in social 
+scientific text analysis -- the "document-term matrix", a matrix where there is a row
+for each document (in this data set each of the  5004 statements is a
+"document"), and there is a column for each possible word, and the values in 
+each cell represents the number of times that a particular word occured in a 
+particular document.
+
+Most text-analysis techniques then manipulate this object in some way to reduce
+its size and complexity. Some common manipulations include:
+
+* tf-idf (a simple way to reduce the weight of words that occur commonly across documents)
+* latent semantic analysis (a method for grouping and finding meaning similarity in words)
+* principle component analysis (another dimension reduction technique, that can be used to find 
+underlying similarities between words)
+
+Many of these techniques are often especially useful in the context of "topic modeling",
+where the goal is to find the major topics across a series of documents (e.g. by examining 
+the ways in which individual words in newspaper articles cluster together 
+(e.g. "game", "ball", "win" v. "election", "leader", "vote"), we can infer the 
+topic of the article (e.g. sports v. politics). However, in this analysis, the central aim
+is not to discover different topics, but simply to see if certain individual words can help us
+in predicting the truthfulness of a statement.
+
+
+# Packages
+
+Again, I will start by loading relevant packages.
+
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse) # cleaning and visualization
+library(quanteda) # text analysis
+library(tidytext) # text analysis
+library(ggthemes)
+```
+
+# Load Data
+
+I will load the most recent version of the cleaned statements, which comes from 
+[Feature Extraction](./hld_FEATURE_overview.html). 
+(Note, we created a more recent object, recording the complexity of
+each statement. However, we will not be using that object right now.)
+
+```{r, message=FALSE, warning=FALSE}
+# this loads: stats_clean (a data-frame of out cleaned statements)
+load("stats_clean.Rda")
+
+```
+
+
+# Example (Generating Bags of Words and the Document-Term Matrix)
+
+Most simply, our goal is to examine all the unique words that occur across all
+statements and then count up the number of times that each of these words
+occurs in each statement. Through looking at these "bags of words", we will create 
+our the document-term matrix.
+
+## Example (Statements)
+
+As before, I will begin with a simple example.
+
+Imagine we have a set of 3 statements, where people are describing their interests.
+
+* "I like cars. I like fast cars, and slow cars, and big cars."
+* "I like to drink. I really like to drink tequila and beer."
+* "I like to eat. My favorite food to eat is pizza."
+
+```{r}
+# Create df, with statements.
+example_df <-
+  data.frame(statement = c("I like cars. I like fast cars, and slow cars, and big cars.",
+                           "I like to drink. I really like to drink tequila and beer.",
+                           "I like to eat. My favorite food to eat is pizza."),
+             stat_num = c(1, 2, 3)) %>%
+  mutate(statement = as.character(statement))
+
+# Print df
+print(example_df)
+
+```
+
+## Example (Unique Words)
+
+One thing we can do with these statements is examine how many unique words there 
+are across all of them. When we count, we see that there are 18 unique words 
+across these three statements. Thus, our final document-term matrix will have 
+3 rows (one for each statement), and 18 columns (one for each unique word that could have 
+occurred in that statement; not that not all words occur in all statements; 
+in fact, most documents, most words don't occur in most documents; rather a 
+few words account for most of text; a phenomenon captured by Zipf's law; 
+Silge, & Robinson, 2016, Chapter 3, Section 2).
+
+```{r}
+# unique words across all 3 statements
+num_unique <- 
+  ntype(x = paste(unlist(example_df$statement),
+                collapse = " "),
+        remove_punct = TRUE)
+
+# Print
+print(paste("Number of unique words: ", num_unique))
+```
+
+## Example (Overall Word Frequencies)
+
+Here we can see how frequently each word was "said" across *all* statements.
+As in a high school cateferia, the most common word is "like". Our next step
+is to count how frequently each word was "said" in each individual statement.
+With this, we will be creating our document-term matrix.
+
+```{r}
+example_df %>%
+  unnest_tokens(input = statement,
+              output = word,
+              token = "words") %>%
+  group_by(word) %>%
+  dplyr::summarize(n = n()) %>%
+  arrange(desc(n)) %>%
+  ggplot(aes(x = reorder(word,
+                         n),
+            y = n)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Word Frequencies Across All Statements",
+       x = "words",
+       y = "frequency") +
+  theme_solarized() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+## Example (Document-Term Matrix)
+
+Below, I've created the document-term matrix, for our simple corpus of
+three statements. In it, we have a row for each statement, and a column
+for each of the unique words that has appeared throughout the entire text. And
+each cell represents a count for many times a given word occurred in a given 
+statment. (I appended the prefix "wrd_" before each word; words themselves are 
+capitalized; this was done to ease readability in later analyses.)
+For example, we see that the word "and" occured twice in the first 
+statement, once in the second statement, and not at all in the third statement.
+Each individual row here can be thought of as a "bag of words" and all the bags 
+together comprise the document-term matrix.
+
+
+```{r}
+# create document-term matrix
+example_dtm <-
+  example_df %>%
+  unnest_tokens(input = statement,
+              output = word,
+              token = "words") %>%
+  mutate(word = toupper(word)) %>%
+  group_by(stat_num, word) %>%
+  dplyr::summarize(n = n()) %>%
+  spread(key = word,
+         value = n,
+         fill = 0)
+
+# rename all words to have a prefix before the word
+old_names <- colnames(example_dtm)[2:ncol(example_dtm)]
+new_names <- paste("wrd_", old_names, sep = "")
+colnames(example_dtm)[2:ncol(example_dtm)] <- new_names
+rm(old_names, new_names) # delete so i can just reuse these variable names later
+
+# print document-term matrix
+example_dtm
+```
+
+# Full Dataset (Generating the Document-Term Matrix)
+
+And now the let's do the same for the full set of statements.
+
+First, let's just get a sense of the properties and distributions of the
+words as they occur across all statements in the dataset.
+
+## Full Dataset (Total Number of Words and Unique Words)
+
+As we can see, there are about 280,000 total words and 11,000 
+unique words across the full set of statements.
+
+```{r}
+data.frame(n = c(ntype(x = paste(unlist(stats_clean$statement),
+                                 collapse = " "),
+                       remove_punct = TRUE),
+                 ntoken(x = paste(unlist(stats_clean$statement),
+                                   collapse = " "),
+                         remove_punct = TRUE)),
+           count_of = c("unique words", "total words")) %>%
+  select(count_of, n) %>%
+  arrange(desc(n))
+```
+
+## Full Dataset (Most Frequent Words)
+
+And now let's look at what are the top 50 most common words in our dataset.
+As we can see, the most frequently occurring word is "i", with well over 15,000
+occurrences. (It might be tempting to call our subjects egocentric, but all 
+questions asked participants about themselves -- what they did yesterday, what
+their regrets are, etc. -- so it's perhaps unsurprising that the most common word was one that
+focused on themselves.) The next most common words are "and", "to", and "a", common
+conjunctions, prepositions, and articles used to glue together sentences.
+
+```{r, fig.width = 9, fig.height = 10}
+# create data frame to store count of number of times each word occurs
+word_freq <-
+  stats_clean %>%
+  select(stat_id,
+         statement) %>%
+  unnest_tokens(input = statement,
+                output = word,
+                token = "words",
+                strip_punct = TRUE) %>%
+  group_by(word) %>%
+  dplyr::summarize(n = n()) %>%
+  arrange(desc(n)) %>%
+  dplyr::mutate(rank = row_number())
+
+# plot the results
+word_freq %>%
+  filter(rank <= 50) %>%
+  ggplot(aes(x = reorder(word, n),
+             y = n)) +
+  geom_col() +
+  geom_text(aes(label = paste("#", rank, sep = "")),
+            position = position_stack(vjust = 0.5),
+            color = "white") +
+  coord_flip() +
+  labs(title = "Top 50 Most Common Words",
+       x = "words",
+       y = "frequency") +
+  theme_solarized() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+## Full Dataset (Zipf's Law)
+
+And now let's look at the distribution of those words.
+A common empirical fact across many types of text is that a
+small set of words account for most of the text in a given corpus.
+In fact, Zipf's Law describes the mathematical relationship between word
+rank and word frequency. I display a graph below which demonstrates that this
+relationship holds in our dataset as well. A few unique words account for most 
+of the total words here too.
+As highlighted by the red dotted lines, the top 5 words account for almost
+20% of all words (19.4% to be more precise). And more than 50% of the
+words are accounted for by only the top 57 (out of over 11,000 unique) words.
+(Note the spacing of the x-axis is log (base 10) scaled.)
+
+
+```{r zipf, warning=FALSE}
+word_freq %>%
+  mutate(prop = n / sum(n),
+         cum_prop = cumsum(n) / sum(n)) %>%
+  ggplot(aes(x = rank,
+             y = round(cum_prop * 100, 1))) +
+  geom_line() +
+  geom_segment(aes(x = 5, xend = 5, y = 0, yend = 19.4),
+               color = "red",
+               linetype = "dotted",
+               size = 0.7) +
+  geom_segment(aes(x = 0, xend = 5, y = 19.4, yend = 19.4),
+               color = "red",
+               linetype = "dotted",
+               size = 0.7) +
+  geom_segment(aes(x = 57, xend = 57, y = 0, yend = 50),
+               color = "red",
+               linetype = "dotted",
+               size = 0.7) +
+    geom_segment(aes(x = 0, xend = 57, y = 50, yend = 50),
+               color = "red",
+               linetype = "dotted",
+               size = 0.7) +
+  scale_y_continuous(breaks = seq(from = 0,
+                                  to = 100,
+                                  by = 10)) +
+  scale_x_continuous(breaks = c(1, 2, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000),
+                     trans = "log10") +
+  labs(title = "Cumulative Percent of Total Words v. Word Frequency (Rank)",
+       y = "Cumulative Percent of Total Words",
+       x = "Word Rank") +
+  theme_solarized() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+## Full Dataset (Document-Term Matrix)
+
+And finally, now let's actually generate the document-term matrix
+for the full dataset.
+
+```{r}
+# create document-term matrix
+start_time <- Sys.time()
+stats_dtm <-
+  stats_clean %>%
+  select(stat_id, statement) %>%
+  unnest_tokens(input = statement,
+              output = word,
+              token = "words",
+              strip_punct = TRUE) %>%
+  mutate(word = toupper(word)) %>%
+  group_by(stat_id, word) %>%
+  dplyr::summarize(n = n()) %>%
+  spread(key = word,
+         value = n,
+         fill = 0)
+total_time <- Sys.time() - start_time # 12-15 seconds (so: quick)
+
+# rename all words to have a prefix before the word
+old_names <- colnames(stats_dtm)[2:ncol(stats_dtm)]
+new_names <- paste("wrd_", old_names, sep = "")
+colnames(stats_dtm)[2:ncol(stats_dtm)] <- new_names
+
+
+# print document-term matrix
+stats_dtm[, 1:7]
+
+```
+
+
+## Full Dataset (Size)
+
+As we can see, the document-term matrix for the full data set is a massive
+object. It has over 56 million cells! (comprised from over 5000 rows and 
+over 11,000 columns).
+
+```{r}
+# dimensions of dtm
+dim(stats_dtm) 
+# cols slightly mismatch # unique words from before
+# (I believe might be due to difference between quanteda and tidytext counting)
+
+# total number of cells
+prod(dim(stats_dtm))
+```
+
+Full Dataset (Mini Document-Term Matrices)
+
+The massive size of this matrix will make modeling difficult as it will 
+greatly increase computation time. As mentioned before, there are various 
+techniques to reduce the size and dimensionality of this document. One 
+solution that people use for example is to simply run a PCA on this matrix
+and extract "core" factors that seem account for covariation among words.
+Other methods include techniques like tf-idf, which discounts more frequntly 
+occuring words. I don't prefer either of these solutions here. PCA
+reduces interpretability as words will eliminated in prediction, and predictions
+will simply be made from the various PCA "factors". Meanwhile, tf-df downweights
+commonly occuring words, which is often useful when trying to infer topics, but
+will be detrimental here, as common words and parts of speech are often the most
+useful for inferring psychological states and characteristics. Indeed, this is 
+the central mantra of James Pennebaker's main research lines on natural language
+and psychology -- which focus on those frequently occuring parts of speech.
+
+I will thus employ a very simple heuristic solution. I will create "mini"
+document-term matrices that only have columns for the very most frequently occuring
+words. Specifically, I will create 4 "mini" document-term matrices -- one 
+with columns only for the top 100 most prevalent words, one with columns 
+only for the top 50 most prevalent words, another with the top 25 words, 
+and a final fourth one with top 10 words. This has the advantage of being easy
+to implement, easy to interpret (in analysis), and further eases prediction as
+frequently occuring words will have observations for most statements (e.g. uncommon
+words like "alligator", which are only said by one person, will be eliminated and
+what will remain is words used by most people).
+
+To make these mini document-term matrices, we'll first need to make an object 
+that ranks words by their frequency.
+
+```{r}
+# note this isn't actually the same as the word_freq object, which was counted
+# with the ntokens() functions from the quanteda package. Further, we are going
+# append the prefix "wrd" in front of each word, for later matching with column names.
+uniq_words <-
+  stats_clean %>%
+  select(stat_id, statement) %>%
+  unnest_tokens(input = statement,
+              output = word,
+              token = "words",
+              strip_punct = TRUE) %>%
+  mutate(word = toupper(word)) %>%
+  group_by(word) %>%
+  dplyr::summarize(n = n()) %>%
+  arrange(desc(n)) %>%
+  dplyr::mutate(rank = row_number()) %>%
+  dplyr::mutate(word = paste("wrd_", word, sep = "")) %>%
+  select(word, rank, n)
+
+# print the outcome
+uniq_words
+```
+
+From this, we can then create the four mini document-term matrices, with the only
+columns for the 100, 50, 25, and 10 most popular words.
+
+```{r}
+# get the names (with "wrd" prefix) of common words
+top100 <- subset(uniq_words, rank <= 100)$word
+top50 <-subset(uniq_words, rank <= 50)$word
+top25 <- subset(uniq_words, rank <= 25)$word
+top10 <- subset(uniq_words, rank <= 10)$word
+
+# create objects
+stats_dtm_100 <- subset(stats_dtm, select = c("stat_id", top100))
+stats_dtm_50 <- subset(stats_dtm, select = c("stat_id", top50))
+stats_dtm_25 <- subset(stats_dtm, select = c("stat_id", top25))
+stats_dtm_10 <- subset(stats_dtm, select = c("stat_id", top10))
+```
+
+
+# Save
+
+Finally, let's save the full document-term matrix and the mini document-term matrices
+we created.
+
+```{r}
+# Save all objects
+save(stats_dtm,
+     stats_dtm_100,
+     stats_dtm_50,
+     stats_dtm_25,
+     stats_dtm_10,
+     file = "stats_words.Rda")
+
+# Remove stats_clean from global environment
+rm(stats_clean)
+
+```
+
+
+# Citations
+
+* Bag-of-words model. (2019). In Wikipedia. Retrieved from https://en.wikipedia.org/w/index.php?title=Bag-of-words_model&oldid=894989930
+
+* Silge, J., & Robinson, D. (2016). tidytext: Text mining and analysis using 
+tidy data principles in r. The Journal of Open Source Software, 1(3), 37.
+
+* Simmons, J. P., Nelson, L. D., & Simonsohn, U. (2011). False-positive psychology:
+Undisclosed flexibility in data collection and analysis allows presenting 
+anything as significant. Psychological Science, 22(11), 1359-1366.
+
+
+# END

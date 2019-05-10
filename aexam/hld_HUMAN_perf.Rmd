@@ -1,0 +1,310 @@
+---
+title: "Human Performance"
+author: Sebastian Deri
+output:
+  html_document:
+    df_print: paged
+    code_folding: show
+---
+
+[return to [overview page](./hld_OVERVIEW.html)]
+
+I will now move on to building predictive models, to use the features
+that we just just extracted from the text, to build predictive models of
+which statements are lies and which statements are truths.
+
+# Packages
+
+Again, I will start by loading relevant packages.
+
+```{r, message=FALSE, warning=FALSE}
+# before knitting: message = FALSE, warning = FALSE
+library(tidyverse) # cleaning and visualization
+library(ggthemes) # visualization
+library(xlsx) # reading in excel file
+library(caret) # for confusionMatrix() function
+library(skimr) # for dope ass summary stats
+```
+
+# Load Data
+
+First, I will load the various cleaned versions of the data we just
+created.
+
+```{r}
+# load in guesses from RAs
+stats_emem <- 
+  read.xlsx("guesses_clean_emem_official.xlsx",
+            sheetIndex = 1)
+
+stats_lexi <-
+  read.xlsx("guesses_clean_lexi.xls",
+            sheetIndex = 1)
+
+# load data frame that has stat_id connected to grd_truth
+load("stats_clean.Rda")
+
+
+```
+
+# Clean Data
+
+```{r}
+# rename columns in emem file
+stats_emem_clean <-
+  stats_emem %>%
+  select(stat_id, 5, 6) %>%
+  rename_at(2, ~ "predict") %>%
+  rename_at(3, ~ "conf") %>%
+  mutate(predict = tolower(trimws(predict))) %>%
+  filter(!is.na(predict)) %>%
+  mutate(person = "emem") %>%
+  dplyr::mutate(order = row_number())
+
+# rename columns in lexi file
+stats_lexi_clean <-
+  stats_lexi %>%
+  select(stat_id, 4, 5, Participant) %>%
+  rename_at(2, ~ "predict") %>%
+  rename_at(3, ~ "conf") %>%
+  mutate(predict = tolower(trimws(predict))) %>%
+  filter(!is.na(predict)) %>%
+  dplyr::rename(person = Participant) %>%
+  mutate(person = trimws(as.character(person))) %>%
+  mutate(person = case_when(person == "1" ~ "lexi",
+                            person != "1" ~ person)) %>%
+  dplyr::mutate(order = row_number())
+
+# combine files
+stats_guess <-
+  bind_rows(stats_emem_clean,
+            stats_lexi_clean)
+
+# join files with ground truth data
+stats_guess <- 
+  stats_guess %>%
+  left_join(y = (stats_clean %>% select(stat_id, grd_truth)),
+            by = "stat_id") %>%
+  select(stat_id,
+         grd_truth,
+         everything()) %>%
+  mutate(predict = as.factor(predict))
+
+# print resulting data frame
+stats_guess
+```
+
+
+# Lies From Each Person
+
+```{r}
+stats_guess %>%
+  dplyr::count(person) %>%
+  arrange(desc(n))
+```
+
+
+# Overall Performance
+
+```{r}
+confusionMatrix(data = stats_guess$predict,
+                reference = stats_guess$grd_truth,
+                positive = "truth")
+
+```
+
+## Performance by Person
+
+### Performance by Person (Store Results)
+
+```{r}
+# -----------------------------------------------------------------------------
+# STEP 1: create vector of names of guessers
+people <- c("lexi", "emem")
+
+# -----------------------------------------------------------------------------
+# STEP 2: initialize data frame to save results
+human_perf <-
+  matrix(ncol = 8,
+         nrow = length(people))
+# name columns
+colnames(human_perf) <- c("person", "accuracy", "accuracy_lower", "accuracy_upper",
+                          "sensitivity", "specificity", "precision", "npv")
+# convert to df
+human_perf <- data.frame(human_perf)
+
+# -----------------------------------------------------------------------------
+# STEP 3: loop through and store performance stats
+counter = 0
+for (person_i in people) {
+  # increment counter
+  counter = counter + 1
+  
+  # generate confusion matrix for this person
+  conf_i <- 
+    confusionMatrix(data = subset(stats_guess,
+                                  person == person_i)$predict,
+                    reference = subset(stats_guess,
+                                       person == person_i)$grd_truth,
+                    positive = "truth")
+  
+  # store current person in results matrix
+  human_perf[counter, 1] <- person_i
+  
+  # store overall accuracy stats
+  human_perf[counter, 2:4] <- c(conf_i$overall[1], conf_i$overall[3], conf_i$overall[4])
+  
+  # store sensitivity, specificity, precision, NPV
+  human_perf[counter, 5:8] <-  c(conf_i$byClass[1], conf_i$byClass[2],
+                         conf_i$byClass[3], conf_i$byClass[4])
+}
+
+```
+
+### Performance by Person (Results)
+
+```{r}
+human_perf
+```
+
+### Peformance by Person (Visualize)
+
+```{r, fig.width=8, fig.height=7}
+human_perf %>%
+  gather(key = "perf_stat",
+         value = "result",
+         accuracy, accuracy_lower, accuracy_upper,
+         sensitivity, specificity, precision, npv) %>%
+  ggplot(aes(x = person,
+             y = round(result * 100, 1),
+             fill = person)) +
+  geom_col() +
+  coord_flip() +
+  facet_wrap( ~ perf_stat,
+            ncol = 1) +
+  scale_y_continuous(breaks = seq(from = 0, to = 100, by = 5)) +
+  geom_hline(yintercept = 50,
+             color = "black",
+             linetype = "dotted",
+             size = 0.5) +
+  labs(title = "Performance Metrics by Person",
+       x = "Person",
+       y = "%") +
+  guides(fill = FALSE) +
+  theme(plot.title = element_text(hjust = 0.5),
+        panel.grid.minor.x = element_blank())
+```
+
+### Performance by Order by Person
+
+```{r, fig.width=8, fig.height=6}
+# calculat results by order
+human_perf_order <-
+  stats_guess %>%
+  mutate(order_tens = floor(order / 10)) %>%
+  mutate(outcome = case_when((predict == "truth") & (grd_truth == "truth") ~ "true_pos",
+                             (predict == "truth") & (grd_truth == "lie") ~ "false_pos",
+                             (predict == "lie") & (grd_truth == "lie") ~ "true_neg",
+                             (predict == "lie") & (grd_truth == "truth") ~ "false_neg")) %>%
+  group_by(person, order_tens, outcome) %>%
+  dplyr::summarise(n = n()) %>%
+  spread(key = outcome,
+         value = n,
+         fill = 0) %>%
+  mutate(accuracy = (true_pos + true_neg) / (true_pos + true_neg + false_pos + false_neg),
+         sensitivity = (true_pos) / (true_pos + false_neg),
+         specificity = (true_neg) / (true_neg + false_pos),
+         precision = (true_pos) / (true_pos + false_pos),
+         npv = (true_neg) / (true_neg + false_neg)) %>%
+  gather(key = "perf_stat",
+         value = "result",
+         accuracy, sensitivity, specificity, precision, npv)
+
+# graph results
+human_perf_order %>%
+  filter((person == "lexi") | (person == "emem"),
+         perf_stat == "accuracy") %>%
+  ggplot(aes(x = order_tens,
+             y = round(result * 100, 1),
+             color = person)) +
+  geom_line() +
+  geom_smooth(method = "loess") +
+  scale_y_continuous(breaks = seq(from = 0, to = 100, by = 5)) +
+  scale_x_continuous(breaks = seq(from = 0, to = max(human_perf_order$order_tens), by = 5)) +
+  labs(title = "Accuracy over Time",
+       y = "Accuracy",
+       x = "Order of Completion (Groups of Tens)") +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "top")
+```
+
+# Confidence Calibration
+
+## Confidence Calibration (Tabulate)
+
+```{r}
+# count number of TP, TN, FP, FN
+stats_guess_keyed <-
+  stats_guess %>%
+  mutate(order_tens = floor(order / 10)) %>%
+  mutate(outcome = case_when((predict == "truth") & (grd_truth == "truth") ~ "true_pos",
+                             (predict == "truth") & (grd_truth == "lie") ~ "false_pos",
+                             (predict == "lie") & (grd_truth == "lie") ~ "true_neg",
+                             (predict == "lie") & (grd_truth == "truth") ~ "false_neg"))
+
+# calculate perf stats at each confidence level
+human_perf_conf <-
+  stats_guess_keyed %>%
+  group_by(conf, outcome) %>%
+  dplyr::summarise(n = n()) %>%
+  spread(key = outcome,
+         value = n,
+         fill = 0) %>%
+  mutate(accuracy = (true_pos + true_neg) / (true_pos + true_neg + false_pos + false_neg),
+         sensitivity = (true_pos) / (true_pos + false_neg),
+         specificity = (true_neg) / (true_neg + false_pos),
+         precision = (true_pos) / (true_pos + false_pos),
+         npv = (true_neg) / (true_neg + false_neg),
+         perc_pos = (true_pos + false_neg) / (true_pos + true_neg + false_pos + false_neg),
+         total = true_pos + true_neg + false_pos + false_neg) %>%
+  select(conf, total, everything())
+
+# print results
+human_perf_conf
+  
+```
+
+## Confidence Calibration (Visualize)
+
+```{r}
+human_perf_conf %>%
+  gather(key = "perf_stat",
+         value = "result",
+         accuracy, sensitivity, specificity, precision, npv) %>%
+  ggplot(aes(x = conf,
+             y = round(result * 100, 1),
+             color = perf_stat)) +
+  geom_point(aes(size = perc_pos)) +
+  geom_line() +
+  geom_hline(yintercept = 50,
+             color = "black",
+             linetype = "dotted",
+             size = 0.50) +
+  scale_y_continuous(breaks = seq(from = 0, to = 100, by = 5)) +
+  labs(title = "Performance by Confidence Level",
+       x = "Confidence Level",
+       y = "%") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+# Save
+
+```{r}
+save(stats_guess,
+     file = "stats_guess.Rda")
+```
+
+
+# END
+

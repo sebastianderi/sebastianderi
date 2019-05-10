@@ -1,0 +1,128 @@
+---
+title: "Modeling (Support Vector Machine)"
+author: Sebastian Deri
+output:
+  html_document:
+    df_print: paged
+    code_folding: show
+---
+
+[return to [overview page](./hld_OVERVIEW.html)]
+
+I will now build a support-vector machine predictive model.
+
+# Packages
+
+Again, I will start by loading relevant packages.
+
+```{r, message=FALSE, warning=FALSE}
+# before knitting: message = FALSE, warning = FALSE
+library(tidyverse) # cleaning and visualization
+library(ggthemes) # visualization
+library(caret) # modeling
+library(AppliedPredictiveModeling)
+library(pROC) # ROC curve
+```
+
+# Load Data
+
+Next, I will load the various cleaned versions of the data we just
+created.
+
+```{r}
+# load all the nice tidy df's of features we created (remember stats_words has multiple dtm's)
+load("stats_all.Rda")
+
+# load individual feature dfs (for training individual models)
+load("stats_clean.Rda")
+load("stats_length.Rda")
+load("stats_pos.Rda")
+load("stats_sent.Rda")
+load("stats_complex.Rda")
+load("stats_words.Rda")
+
+```
+
+
+# Example (Single Model)
+
+## Step 1a: Split the Data (Index)
+
+```{r}
+# get index for random 50% of data, and count this as training data (rest will be test)
+index_svm <- createDataPartition(y = stats_clean$grd_truth,
+                                 p = 0.50,
+                                 list = FALSE)
+
+# check length (should be 2502)
+length(index_svm)
+```
+
+## Step 1b: Split the Data (Actual Train and Test Set)
+
+```{r}
+train_svm <- stats_all[index_svm, ]
+test_svm <- stats_all[-index_svm, ]
+
+#check lengths
+dim(train_svm)
+dim(test_svm)
+
+# check no overlap
+# just showing you what test case looks like
+intersect(c(1, 1, 2, 3, 4, 4, 5, 6, 101), c(1, 5, 101))
+
+# length of the intersection should be zero
+length(intersect(train_svm$stat_id, test_svm$stat_id))
+
+```
+
+
+## Step 2: Train Model on Training Data
+
+```{r}
+model_svm <-
+  train(data = train_svm,
+        form = grd_truth ~ . - stat_id,
+        method = "svmRadial")
+
+# train model
+model_svm <-
+  train(x = train_svm[, !(names(train_svm) %in% c("stat_id", "grd_truth"))],
+        y = train_svm$grd_truth,
+        method = "svmRadial")
+
+# get predictions of model
+svm_predicts <-
+  predict(object = model_svm,
+          newdata = test_svm[, !(names(train_svm) %in% c("stat_id", "grd_truth"))])
+
+# confusion matrix, with results
+confusionMatrix(svm_predicts, test_svm$grd_truth)
+
+```
+
+
+What happens with some pre-processing
+
+```{r}
+# train model
+model_svm2 <-
+  train(x = train_svm[, !(names(train_svm) %in% c("stat_id", "grd_truth"))],
+        y = train_svm$grd_truth,
+        method = "svmRadial",
+        preProcess = c("center", "scale"))
+
+# get predictions of model
+svm2_predicts <-
+  predict(object = model_svm2,
+          newdata = test_svm[, !(names(train_svm) %in% c("stat_id", "grd_truth"))])
+
+# confusion matrix, with results
+confusionMatrix(svm2_predicts, test_svm$grd_truth)
+```
+
+
+## Step 3:
+
+

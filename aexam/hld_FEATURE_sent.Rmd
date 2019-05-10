@@ -1,0 +1,427 @@
+---
+title: "Feature Extraction (Sentiment)"
+output:
+  html_document:
+    df_print: paged
+    code_folding: show
+---
+
+[return to [overview page](./hld_OVERVIEW.html)]
+
+The feature I am now going to extract is some proxy for each statement's sentiment.
+There are plausible reasons to believe and indeed some empirical evidence that
+sentiment (the affective, emotional content of a statement)  might vary between
+when people are lying and telling the truth -- and thus might be somewhat of a proxy
+for whether a statement is truthful or a lie. It is plausible that  when people are lying
+they are often not in the same emotional state as when they are telling the truth.
+Most obviously, they may be more anxious. Other negative affect states (e.g. guilt)
+may also accompany lying, leading perhaps to an overall more negative affective state.
+If these emotions leak out in the way people speak and
+the words they use, by analyzing the sentiment in people's statements, we may
+have some predictive signal about whether they are lying. Indeed,
+Pennebaker, Mehl, & Niederhoffer (2003, p.564), reviewing the evidence connecting
+sentiment and lying, state "several labs have found slight but consistent 
+elevations in the use of negative emotion words during deception compared with 
+telling the truth (e.g., Knapp & Comadena 1979, Knapp et al. 1974, Newman et al.
+2002, Vrij 2000)." Likewise, in their review of the behavioral cues of lying, 
+DePaulo, Lindsay, Malone, Muhlenbruck, Charlton, & Cooper (2003) find evidence 
+that liars are less positive and more tense -- for example, making more negative 
+statements and complaints (see Table 5, from p. 93, below), and exhibiting more 
+tense and fidgety behavior (see Table 6, from p. 93, below).
+
+Obviously such a signal might be very weak, as the emotional
+content of people's speech vary for all sorts of reasons (and in the particular
+context that this data was collected, the stakes were extremely low, so there
+may be even less reason for people to feel, for example, anxious when lying).
+(And see, for example, Vrij, Fisher, Mann, & Leal (2006) for critiques of 
+fear and other emotion-based accounts of deception detection. )
+Nevertheless, it is worth extracting this feature and exploring this avenue.
+
+![](./pics/depaulo_positive_table5.png)
+
+![](./pics/depaulo_tense_table6.png)
+
+# Packages
+
+Again, I will start by loading relevant packages.
+
+```{r, message=FALSE, warning=FALSE}
+library(tidyverse) # cleaning and visualization
+library(quanteda) # text analysis
+library(tidytext) # has function for sentiment extraction
+```
+
+# Load Data
+
+I will load the most recent version of the cleaned statements, which comes from 
+[Feature Extraction](./hld_FEATURE_overview.html). 
+(Note, we created a more recent object, recording the frequency of the
+occcurance of various parts of speech. However, we will not be using
+that object right now.)
+
+```{r, message=FALSE, warning=FALSE}
+# this loads: stats_clean (a data-frame of out cleaned statements)
+load("stats_clean.Rda")
+
+```
+
+
+# Sentiment
+
+Here, the goal is to extract the sentiment from each statement. This is also
+done on a word by word basis. Each word is mapped onto a sentiment (e.g. positive,
+negative). And then for each sentence we can count up the numbers of words with
+each type of sentiment (e.g total number of positive words, total number of 
+negative words).
+
+## Sentiment dictionaries
+
+Some of the most popular methods for sentiment extraction involve essentially
+the same method. The authors take a big list of words, then for each word, they
+map a sentiment to that word (or multiple sentiments, in some cases). The most 
+well known of such cases is LIWC (Pennebaker, Francis, & Booth, 2001; Tausczik, 
+& Pennebaker, 2010). A notable downside of the LIWC dictionary is that it is
+propietary, i.e. you have to pay for it.
+
+Nevertheless, there are many freely available dictionaries that map from
+words to sentiment. Some of these are summarized by Silge & Robinson (2016)
+in their text analysis textbook (which is specifically geared toward text
+analysis in R, and even more specifically using the tidy approach to R data).
+They note (and make available) 3 popular sentiment mapping dictionaries:
+
+* bing: from Hu & Liu (2004)
+* AFINN: from Nielsen (2011)
+* nrc: from Mohammad & Turney (2013)
+
+These are all created through some sort of analysis of large scale web data.
+(See citations at the end for further references on the creation and use of
+each of these lexicons.)
+
+Some of these lexicons map words to a large set of possible sentiments. For
+example, the nrc lexicon maps words to the following sentiments:
+negative, positive, fear, anger, trust, sadness, disgust, surprise, anticipation,
+joy. Other lexicons, like bing, simply map to either positive or negative sentiment,
+and that's it. Others like afinn map to a number quantity (in their case,
+indicating the degree of negativity or positivity from -5 to +5).
+
+To begin, we are just going to map to positive and negative sentiment. And
+we are going to use the bing set of words, because it appears to have the
+largest number of words with a positive or negative mapping.
+
+## Sentiment Extraction
+
+Here, I will be relying on the tidytext
+package created by Silge & Robinson (2016), and explained in their aformentioned
+textbook on the subject.
+
+Again, I will proceed by way of example.
+
+## Sentiment Extraction (Example)
+
+Let's look at two example sentences:
+
+* "The murder made me sad and depressed."
+* "The party made me happy and excited, but also a little overwhelmed."
+
+First, let's save these sentences to a data object and print them.
+
+```{r}
+# create sentences
+example <-
+  data.frame(sentence = c("The murder made me sad and depressed.",
+                      "The party made me happy and excited, but also a little overwhelmed.")) %>%
+  mutate(sentence = as.character(sentence),
+         sent_num = row_number()) %>%
+  select(sent_num,
+         sentence)
+
+# Print Sentences
+example
+
+```
+
+### Load Bing Sentiment Dictionary
+
+
+What we want to do next is take each of the the words in these two sentences
+and find all the words in them that have been mapped to a sentiment in the bing
+dictionary. To do that, we need to first load in the dictionary of word 
+mappings from bing. I do that below. We can see that over 6,788 words have 
+been mapped to either a positive or negative sentiment.
+
+```{r}
+# load bing sents and save to object
+(bing_sents <- get_sentiments(lexicon = "bing"))
+
+```
+
+### Map Words to Sentiment (Example)
+
+Okay, now we are finally read to get to mapping. Here, we now just look up all 
+the words in our two sentences, and find any words which
+appear in the bing dictionary, and record the sentiment to which that word
+is mapped. I do that and show the output below. As we can see, many words
+are not mapped to a sentiment at all. But several key words are. In the 
+first sentence, we see that "murder", "sad", and "depressed" were all
+mapped on to the negative sentiment category. And in the second sentence,
+we see that "party", "happy", anbd "excited" were all mapped on to the 
+positive sentiment category, while "overwhelmed" was mapped on to the
+negative sentiment category.
+
+```{r}
+# create long form object
+example_long <-
+  example %>%
+  # the unnest_tokens() functions comes from the tidytext package
+  unnest_tokens(input = sentence,
+                output = word,
+                token = "words") %>%
+  mutate(word_num = row_number()) %>%
+  left_join(y = bing_sents,
+            by = "word") %>%
+  select(sent_num,
+         word_num,
+         word,
+         sentiment)
+
+# print long form object
+example_long
+
+```
+
+### Summarize Sentiment Across Statement
+
+Now, what we want to do is count up the number of positive and negative words
+in each sentence. And then we want to convert our data back to a "wide" format,
+where each row represents a sentence instead of a word. I will also compute
+the "net" sentiment of each sentence (that is, the number of positive words
+minus the number of negative words). That is what I do below. As we can we see,
+when we do this, the first sentence has a net sentiment score of negative 3 
+(3 negative words and no positive words), and the second sentence has a net 
+sentiment score of 1 (2 positive words minus 1 negative word).
+
+
+```{r}
+example_long %>%
+  filter(!is.na(sentiment)) %>%
+  group_by(sent_num,
+           sentiment) %>%
+  summarise(n = n()) %>%
+  spread(key = sentiment,
+         value = n,
+         fill = 0) %>%
+  rename(sent_POS = positive,
+         sent_NEG = negative) %>%
+  mutate(sent_NET = sent_POS - sent_NEG) %>%
+  select(sent_num,
+         sent_POS,
+         sent_NEG,
+         sent_NET)
+
+
+```
+
+
+## Sentiment Extraction (Full Dataset)
+
+Okay, now let's apply this process to our full set of 5,004 statements. (I'm
+just going to do this all together now in one fell swoop, as the step-by-step
+logic is laid out above.) The resultant object is printed, which is another
+tabular object, where each statement is a row. As we can see, many
+statements contain few positive or negative sentiment words.
+
+```{r}
+# tally sentiment for each statement and save to stats_sent
+stats_sent <-
+  stats_clean %>%
+  select(stat_id,
+         statement) %>%
+  unnest_tokens(input = statement,
+                output = word,
+                token = "words") %>%
+  left_join(y = bing_sents,
+            by = "word") %>%
+  group_by(stat_id,
+           sentiment) %>%
+  summarise(n = n()) %>%
+  spread(key = sentiment,
+         value = n,
+         fill = 0) %>%
+  rename(sent_POS = positive,
+         sent_NEG = negative) %>%
+  mutate(sent_NET = sent_POS - sent_NEG) %>%
+  select(stat_id,
+         sent_POS,
+         sent_NEG,
+         sent_NET) %>%
+  ungroup()
+  
+# print the resultant object
+stats_sent
+  
+```
+
+
+## Extract Sentiment (Results)
+
+Okay, let's take a look at the data this has generated.
+
+
+### Most Positive Statements
+
+First, let's take a look at some of the statements with the highest
+sentiment scores. I have sorted the statements below by their net sentiment
+score, putting those statements with the highest sentiment score first.
+As we can see, there is some  face validity to our sentiment
+measurement, as those statements with the highest net sentiment score do
+appear to describe very affectively positive situations. For example,
+the second most positive statement is an apparent paean to a girlfriend,
+"I like rose rose because she is my girlfriend. she is kind and loving.
+she really likes me. she is very caring and generous." the third statement
+is similar, "eb is a talent[ed], intelligent, caring, beautiful individual."
+
+```{r}
+stats_sent %>%
+  left_join(y = (stats_clean %>%
+                   select(stat_id,
+                          statement)),
+            by = "stat_id") %>%
+  select(statement,
+         sent_NET,
+         sent_POS,
+         sent_NEG,
+         stat_id) %>%
+  arrange(desc(sent_NET))
+```
+
+### Most Negative Statements
+
+And, in comparison, here are the statements ordered by net sentiment score,
+starting with the most net negative statement first. Again, the top statements
+appear face valid. The most negative statement begins "i regret being born ..."
+
+```{r}
+stats_sent %>%
+  left_join(y = (stats_clean %>%
+                   select(stat_id,
+                          statement)),
+            by = "stat_id") %>%
+  select(statement,
+         sent_NET,
+         sent_POS,
+         sent_NEG,
+         stat_id) %>%
+  arrange(sent_NET)
+
+```
+
+### Distribution of Sentiment Across Questions
+
+Let's also examine how net sentiment varies by question. Below, I display the 
+distribution of net sentiment for each of the six questions. (Again, some
+of the most extreme responses are filtered out to make the distributions more
+easily comparable visually.) We see some other re-assuring patterns from examining
+these histograms. For example, the liking, hobby, and strength questions appears
+clearly most positive (which makes sense; all three asked people to describe
+something essentialy positive - someone they like, a hobby, or a personal strength).
+Likewise, the most negative distribution appears to be the distribution for the
+regret question, which again makes sense -- regret is a negative emotion.
+
+```{r, fig.width=5, fig.height=10}
+stats_sent %>%
+  left_join(y = (stats_clean %>%
+                   select(stat_id,
+                          q_num)),
+            by = "stat_id") %>%
+  filter(sent_NET < 10,
+         sent_NET > -5) %>%
+  mutate(q_num = factor(q_num,
+                        labels = c("Q1 (Meeting)",
+                                   "Q2 (Regret) ",
+                                   "Q3 (Yesterday)",
+                                   "Q4 (Liking)",
+                                   "Q5 (Strength)",
+                                   "Q6 (Hobby)"))) %>%
+  ggplot(aes(x = sent_NET,
+             fill = q_num)) +
+  geom_histogram() +
+  facet_wrap( ~ q_num,
+              ncol = 1) +
+  guides(fill = FALSE)
+
+```
+
+
+# Save
+
+Finally, let's save the data object we created, which stores sentiment scores
+for each of our statements.
+
+```{r}
+# save
+save(stats_sent,
+     file = "stats_sent.Rda")
+
+# remove stats_clean from global environment
+rm(stats_clean)
+```
+
+
+
+# Citations
+
+
+## Sentiment Dictionary Citations
+
+
+* bing: https://www.cs.uic.edu/~liub/FBS/sentiment-analysis.html
+
+* bing: Hu, M., & Liu, B. (2004, August). Mining and summarizing customer reviews.
+In Proceedings of the tenth ACM SIGKDD international conference on Knowledge 
+discovery and data mining (pp. 168-177). ACM.
+
+* afinn: http://www2.imm.dtu.dk/pubdb/views/publication_details.php?id=6010
+
+* afinn: Nielsen, F. Å. (2011). A new ANEW: Evaluation of a word list for
+sentiment analysis in microblogs. arXiv preprint arXiv:1103.2903.
+
+* LIWC: Pennebaker, J. W., Francis, M. E., & Booth, R. J. (2001). Linguistic inquiry
+and word count: LIWC 2001. Mahway: Lawrence Erlbaum Associates, 71(2001), 2001.
+
+* LIWC: Tausczik, Y. R., & Pennebaker, J. W. (2010). The psychological meaning of words:
+LIWC and computerized text analysis methods. Journal of language and social psychology,
+29(1), 24-54.
+
+* nrc: http://saifmohammad.com/WebPages/NRC-Emotion-Lexicon.htm
+
+* nrc: Mohammad, S. M., & Turney, P. D. (2013). Crowdsourcing a word-emotion
+association lexicon. Computational Intelligence, 29(3), 436-465.
+
+## Other Citations
+
+* DePaulo, B. M., Lindsay, J. J., Malone, B. E., Muhlenbruck, L., Charlton, K., 
+& Cooper, H. (2003). Cues to deception. Psychological Bulletin, 129(1), 74.
+
+* Knapp, M., & Comaden, M. E. (1979). Telling it like it isn't: A review of
+theory and research on deceptive communications. Human Communication Research, 
+5(3), 270-285.
+
+* Knapp, M. L., Hart, R. P., & Dennis, H. S. (1974). An exploration of 
+deception as a communication construct. Human Communication Research, 1(1), 15-29.
+
+* Pennebaker, J. W., Mehl, M. R., & Niederhoffer, K. G. (2003). 
+Psychological aspects of natural language use: Our words, our selves.
+Annual Review of Psychology, 54(1), 547-577.
+
+* tidytext: Silge, J., & Robinson, D. (2016). tidytext: Text mining and analysis
+using tidy data principles in r. The Journal of Open Source Software, 1(3), 37.
+https://doi.org/10.21105/joss.00037.
+
+* Vrij, A. (2000). Detecting Lies and Deceit: The Psychology of Lying and 
+Implications for Professional Practice.(Wiley Series on the Psychology of 
+Crime, Policing and Law).
+
+* Vrij, A., Fisher, R., Mann, S., & Leal, S. (2006). Detecting deception 
+by manipulating cognitive load. Trends in Cognitive Sciences, 10(4), 141-142.
+
+# END

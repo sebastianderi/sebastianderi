@@ -1,0 +1,116 @@
+---
+title: "Hybrid Lie Detection"
+author: Sebastian Deri
+output:
+  html_document:
+    df_print: paged
+---
+
+# Overview
+
+Communication involves the exchange of information between two or more
+parties. An important part of this information exchange involves judging the
+truth-value or reliability of information that is received
+(Crawford & Sobel, 1982). Thus, in the process of communication,
+many communicators are engaging to some extent in "lie detection"
+as they communicate.
+
+How "good" people are at lie detection is an open question and one that
+receives different answers depending on where and how you look (Bond, & DePaulo,
+2006; ten Brinke, Vohs, & Carney, 2016; Vrij & Granhag, 2012). In the "real world",
+information is often communicated via face-to-face conversations that
+allow for receivers to observe and judge various types of information present:
+visual information about the speaker's facial expressions, auditory information
+about the tone and pitch of the speaker's voice, as well as the literal statements
+themselves made by the speaker. While all of these may provide useful information
+about the potential truth value of a communication, the truth value to be
+judged is ultimately in these statements themselves -- which can be captured
+strictly as text (e.g. written sentences).
+
+In this report, I focus on "lie detection" based on evaluations of only
+such textual written statements. Specifically, the intention is to
+compare the "lie detection" performance of various decision-making agents:
+humans, computers (i.e. statistical models trained on text), and
+hybrid configurations that incorporate both human and computational
+judgments. Their performance will be evaluated on a specific data set of textual
+truth and lie statements that I have collected. A bulk of the work will be in
+building a framework that parses the text and then builds a statistical model
+to predict truths and lies (i.e. creating and assessing the computer model). 
+
+The format of this report is such that it allows me to walk through
+the analysis process step by step. The exposition takes the form of a series of
+inter-connected data analysis files (R Notebook files) that can be displayed
+in a "web page" like format (i.e. as html files) -- which allows me to interweave 
+verbal exposition of the analysis with the actual code needed to execute that analysis.
+Another benefit of exposition in this form is that it allows me to do the
+analysis in a highly reproducible way; every step is documented in
+a systematic sequential fashion, such that not only should any researcher
+be able to follow along and see how each result is attained but also, if they
+were to so choose, they should be able to reproduce the entirely of the results
+themselves from simply the raw data and these analysis files -- without any need for
+guesswork or adjustment.
+
+(As a result of this, however, some sections might also include more granular
+and tedious information than you, the reader, might be interested in.
+Feel free to skip over any sections or notes that seem tedious or trivial.
+The construction of this document was a learning process for me,
+so if anything seems condescendingly simple, assuming it is because I am
+explaining or reminding myself of something.)
+
+That analysis is broken down into the following major sections, which
+build on each other sequentially.
+
+* [Data Generation](./hld_DATAGEN.html)
+* [Data Overview](./hld_DATAOVERVIEW.html)
+* Computer Performance
+    + [Feature Extraction](./hld_FEATURE_overview.html)
+        + [Statement Length](./hld_FEATURE_length.html)
+        + [Parts of Speech](./hld_FEATURE_pos.html)
+        + [Sentiment](./hld_FEATURE_sent.html)
+        + [Readability & Complexity](./hld_FEATURE_complex.html)
+        + [Bag of Words](./hld_FEATURE_words.html)
+    + [Data Cleaning & Pre-Processing](./hld_CLEAN.html)
+    + Modeling
+        + [Modeling Overview](./hld_MODEL_overview.html)
+        + [Logistic Regression](./hld_MODEL_logistic.html)
+        + Neural Networks
+        + Support Vector Machines
+        + Rules Based Models
+        + Tree Based Model (e.g. Random Forest)
+        + K-Nearest Neighbors
+* [Human Performance](./hld_HUMAN_perf.html)
+* Hybrid Performance
+
+
+# Resources
+
+These textbooks were invaluable in the preparation of this analysis:
+
+* Kuhn, M., & Johnson, K. (2013). Applied predictive modeling (Vol. 26). Springer.
+
+* Silge, J., & Robinson, D. (2016). tidytext: Text mining and analysis using 
+tidy data principles in r. The Journal of Open Source Software, 1(3), 37.
+
+* Venables, W. ., Smith, D. M., & R Core Team. (2018). An Introduction to R 
+Notes on R: A Programming Environment for Data Analysis and Graphics Version 
+3.5.1 (2018-07-02). Retrieved from 
+https://cran.r-project.org/doc/manuals/r-release/R-intro.pdf
+
+* Wickham, H., & Grolemund, G. (2016). R for data science: import, tidy, 
+transform, visualize, and model data. O'Reilly Media, Inc.
+
+
+# References
+
+* Bond Jr, C. F., & DePaulo, B. M. (2006). Accuracy of deception judgments.
+Personality and social psychology Review, 10(3), 214-234.
+
+* Crawford, V. P.; Sobel, J. (1982). "Strategic Information Transmission".
+Econometrica. 50 (6): 1431-1451. CiteSeerX 10.1.1.461.9770. doi:10.2307/1913390
+
+* ten Brinke, L., Vohs, K. D., & Carney, D. R. (2016). Can ordinary people 
+detect deception after all?. Trends in cognitive sciences, 20(8), 579-588.
+
+* Vrij, A., & Granhag, P. A. (2012). Eliciting cues to deception and truth:
+What matters are the questions asked. Journal of Applied Research in Memory
+and Cognition, 1(2), 110-117.
