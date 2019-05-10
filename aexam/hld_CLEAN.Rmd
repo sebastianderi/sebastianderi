@@ -62,7 +62,7 @@ stats_all <-
                       stats_pos,
                       stats_sent,
                       stats_complex,
-                      stats_dtm_25),
+                      stats_dtm_100),
            by = "stat_id",
            type = "left") %>%
   left_join(stats_clean %>%
@@ -79,34 +79,6 @@ stats_all
 
 ```
 
-# Transforming Data
-
-Next, I will transform the data to ease interpretation and allow for better comparison
-in later analyses. Specifically, I am going to center and
-rescale all predictor variables (i.e. features we previously extracted). First,
-I will center all variables around their mean -- i.e. for each variable, compute its
-mean and then subtract that value from each row. In this way, we will know that any
-value which approaches zero will be the near the mean for that variable. Second, I 
-will rescale each variable by its standard deviation -- i.e. divide the values in 
-each column by the standard deviation of that column, so that deviations between 
-variables are comparable. Thus, for any variable, a value like 0.5 will 
-mean the same thing -- that value is 0.5 standard deviations above the mean for 
-that feature. Luckily, the preProcess function in the caret package (Kuhn, 2008) 
-makes this extremely easy.
-
-```{r}
-# center and scale with preProcess and predict from caret
-stats_allclean <- 
-  predict(newdata = stats_all,
-          preProcess(x = subset(stats_all,
-                                select = -c(stat_id, grd_truth)),
-                     method = c("center", "scale")))
-
-# print centered and scales data frame
-stats_allclean
-
-```
-
 
 # Cleaning Data
 
@@ -114,11 +86,11 @@ Before engaging in any predictive modeling, it's important to make sure that
 there are no major underlying problems in that data. As Kuhn & Johnson (2013, p. 27) 
 note "data preparation can make or break a model's predictive ability". They 
 outline a few key issues to check for when cleaning or pre-processing data.
-The ones that are particular relevant to use are
+The ones that are particular relevant to us are
 
 * skew in predictors
-* collinearity among predictors
 * zero or near zero variance in predictors
+* collinearity among predictors
 
 I am going to check for each of these problems and adjust (i.e. delete or transform)
 data in cases where any major problems seem to arise. Later, when we actually build
@@ -126,38 +98,69 @@ predictive models, we can compare the performance of models that use this cleane
 data compared to models that use the raw data.
 
 
-## Skew (Visualizing)
+## Visualizing Variable Distributions
 
-Let's start by visualizing the distributions of all the variables. As we can see
-when we do this, there is a fair deal of skew in our data. This outlying points
-may exert a high degree of influence on some of our model's estimates and thus 
+To get an overall sense of our variables, let's take a look at their distributions.
+This is plotted below (one distribution for each of our 124 variables;
+different categories of features are delineated in different colors).
+when we do this, we see there is a fair deal of skew in many of our variables.
+And some variables do not seem to have much variance (e.g. the majority of the
+data points are the same value). The outlying points in these skewed distributions
+may exert a high degree of influence on some of our model's estimates.
+And the variables with zero or near zero variance simply won't be very useful
+for prediction. Let's go about adjusting our data a bit to account for this.
 
 
-```{r hists, fig.width = 10, fig.height=10}
-stats_allclean %>%
+```{r hists, fig.width = 10, fig.height=26}
+stats_all %>%
   select(-stat_id) %>%
   keep(is.numeric) %>% 
-  gather() %>% 
-  ggplot(aes(value)) +
-    facet_wrap(~ key, scales = "free") +
-    geom_histogram()
+  gather(key = "variable",
+         value = "value") %>%
+  mutate(feature_type = case_when(grepl("^n_", variable) ~ "length",
+                                  grepl("^pos_", variable) ~ "part_of_speech",
+                                  grepl("^sent_", variable) ~ "sentiment",
+                                  grepl("^read_", variable) ~ "complexity",
+                                  grepl("^wrd_", variable) ~ "word")) %>%
+  ggplot(aes(x = value,
+             fill = feature_type)) +
+    facet_wrap(~ variable,
+               ncol = 7,
+               scales = "free") +
+    geom_histogram() +
+    scale_fill_discrete(breaks=c("length", "part_of_speech", "complexity",
+                                 "sentiment", "word")) +
+    theme(legend.position="top")
 ```
 
-## Skew (Eliminating)
+## Skew (Adjusting)
 
 Kuhn & Johnson, (2013) suggest a fair number of popular ways of dealing with 
-skewed data. One common solution 
+skewed data. One common solution is to apply different types of transformations
+to the data, depending on the direction of the skew. One very popular method (that
+also has the advantage of minimizing thinking) is to apply the  Box & Cox (1964)
+transformations, which are entire family of transformations that adjust various
+skewed distributions in pre-defined ways according to their skew. However, I don't
+love these transformations because they reduce the interpretability of coefficients
+(e.g. some variables might be squared, others raised to the power -1). Further,
+many of our distributions are simply poisson-looking count distributions, with most
+variables occuring in a few different count bins -- various transformations aren't
+really going have much of an effect on the distributions between these bins,
+just the spacing between them. What I am more worried about are those distributions
+where a few extreme outliers are significantly skewing the distributions (e.g. the
+distributions for "n_words", which counts the number of words in each statement).
+A nicer and simpler type of transformation exists that eliminates these outliers,
+without needing to change the scales, and thus leaving our variables in interpretable units.
+This is to simply select some cut points at the ends of the distribution (e.g. at 5%
+and 95%) and make those the lowest and highest possible values (i.e. any values below
+the 5th percentile are transformed into whatever the 5th percentile value is, and 
+any values above the 95th percentile value are transformed into whatever the 95 percentile
+value is). This method is called Winsorizing (Winsorizing, 2019).
 
-```{r}
-skewness(stats_all$pos_INTJ)
 
-as.data.frame(
-  lapply(subset(stats_all, select = -c(stat_id, grd_truth)),
-         e1071::skewness)) %>%
-  gather(key = "feature",
-         value = "skew") %>%
-  arrange(desc(skew))
-```
+Let me demonstrate what the this look like on one variable, which appears highly
+skewed (the "n_words" count, referenced earlier). Visualized below are the raw
+distribution and the winsorized distribution.
 
 
 ```{r}
@@ -175,26 +178,48 @@ stats_all %>%
     geom_histogram()
 ```
 
+
+To apply this transformation, we have to have some method for deciding which 
+variables are skewed enough that they warrant winsorization. We could 
+decide this based on visual inspection of the individual histograms above and
+personal judgment. However, there are a lot of these. And there exist other 
+metrics for quantifying skew -- kurtosis, skew, and other rules of thumb (e.g.
+the ratio between the max and min value for a variable should be no more than 20)
+(Kuhn & Johnson, 2013, Chapter 3). I am going to simply choose the metric called
+"skewness" (there's no obvious reason why one metric is better than another).
+The formula for this metric is shown below, and some rules of thumb suggest that
+we should worry about distributions with skewness values greater than 2. So, we'll
+winsorize all variables that have a skewness greater than 2.
+
+![](.pics/kuhn_p31_skew.PNG)
+
+
 ```{r}
-stats_all$wrd_ME2 <- 
-  Winsorize(stats_all$wrd_ME,
-            probs = c(0.01, 0.99))
+skewness(stats_all$pos_INTJ)
 
-stats_all %>%
-  select(wrd_ME,
-         wrd_ME2) %>%
-  gather() %>% 
-  ggplot(aes(value)) +
-    facet_wrap(~ key, scales = "free") +
-    geom_histogram()
-
+as.data.frame(
+  lapply(subset(stats_all, select = -c(stat_id, grd_truth)),
+         e1071::skewness)) %>%
+  gather(key = "feature",
+         value = "skew") %>%
+  arrange(desc(skew))
 ```
 
+## Zero or Near Zero Variance
+
+Another type of issue in our data we might want to deal with is those variables
+that exhibit zero or near zear variances (with almost all data points clustered at
+one value). The caret package has a built in function, nearZeroVar, which helps
+us automatically identify such variables. (It does this by identifying variables
+where either all values are the same, or the ratio of the first most frequent 
+value to the second most frequent value is beyong some specified threshold).
 
 
 
 ```{r}
-skewness(stats_all$n_words2)
+nearZeroVar(stats_all,
+            saveMetrics = TRUE) %>%
+  arrange(freqRatio)
 ```
 
 
@@ -225,31 +250,36 @@ stats_allclean <-
   select(-high_corr_names)
 ```
 
-## Zero or Near Zero Variance
+
+
+
+# Transforming Data
+
+Finally, I will transform the data to ease interpretation and allow for better comparison
+in later analyses. Specifically, I am going to center and
+rescale all predictor variables (i.e. features we previously extracted). First,
+I will center all variables around their mean -- i.e. for each variable, compute its
+mean and then subtract that value from each row. In this way, we will know that any
+value which approaches zero will be the near the mean for that variable. Second, I 
+will rescale each variable by its standard deviation -- i.e. divide the values in 
+each column by the standard deviation of that column, so that deviations between 
+variables are comparable. Thus, for any variable, a value like 0.5 will 
+mean the same thing -- that value is 0.5 standard deviations above the mean for 
+that feature. Luckily, the preProcess function in the caret package (Kuhn, 2008) 
+makes this extremely easy.
 
 ```{r}
-nearZeroVar(stats_all)
+# center and scale with preProcess and predict from caret
+stats_allclean <- 
+  predict(newdata = stats_all,
+          preProcess(x = subset(stats_all,
+                                select = -c(stat_id, grd_truth)),
+                     method = c("center", "scale")))
+
+# print centered and scales data frame
+stats_allclean
+
 ```
-
-
-
-
-```{r}
-cor(stats_all[, 16:22])
-```
-
-
-```{r}
-cor(
-  stats_all[, 
-            -which(
-              names(stats_all) 
-              %in% c("stat_id", "grd_truth")
-              )])
-```
-
-
-# Dimension Reduction
 
 
 
@@ -258,6 +288,7 @@ cor(
 ```{r}
 # save the raw and various cleaned data objects
 save(stats_all,
+     stats_allclean,
      file = "stats_all.Rda")
 
 ```
@@ -267,6 +298,9 @@ Now, let's save the various objects created.
 
 # Citations
 
+* Box, G. E., & Cox, D. R. (1964). An analysis of transformations. 
+Journal of the Royal Statistical Society: Series B (Methodological), 26(2), 211-243.
+
 * Join (SQL). (2018). In Wikipedia. 
 Retrieved from https://en.wikipedia.org/w/index.php?title=Join_(SQL)&oldid=868927067
 
@@ -274,5 +308,9 @@ Retrieved from https://en.wikipedia.org/w/index.php?title=Join_(SQL)&oldid=86892
 Journal of Statistical Software, 28(5), 1-26.
 
 * Kuhn, M., & Johnson, K. (2013). Applied predictive modeling (Vol. 26). Springer.
+
+* Winsorizing. (2019). In Wikipedia. Retrieved from 
+https://en.wikipedia.org/w/index.php?title=Winsorizing&oldid=891819633
+
 
 # END
