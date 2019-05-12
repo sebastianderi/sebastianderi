@@ -9,9 +9,12 @@ output:
 
 [return to [overview page](./hld_OVERVIEW.html)]
 
-I will now move on to building predictive models, to use the features
-that we just just extracted from the text, to build predictive models of
-which statements are lies and which statements are truths.
+As Gelman & Hill (2006, p. 79) note "logistic regression is the standard way 
+to model binary outcomes." So let's start our predictive modeling here. Our focus
+throughout will be on assessing the performance of the logistic regression models
+we build -- more so than interpreting coefficients, which is often the focus
+in a great deal of social science research (where the emphasis is on
+explanation and thus the variables which "explain" some outcome).
 
 # Packages
 
@@ -22,15 +25,277 @@ Again, I will start by loading relevant packages.
 library(tidyverse) # cleaning and visualization
 library(ggthemes) # visualization
 library(caret) # modeling
+library(jtools) # for visualizing coefficients
+library(ggstance) # i think need for plot_coeffs function used by jtools
+library(broom) # has ggcoef function
 library(AppliedPredictiveModeling)
 library(pROC) # ROC curve
+
 ```
 
 # Load Data
 
-First, I will load the various cleaned versions of the data we just
-created.
+Next, I will load the pre-processed data, which we created earlier
+(see [Data Cleaning & Pre-Processing](./hld_CLEAN.html)). This dataset has
+a row for each of 5,004 statements, a column indicating whether that particular
+statement was a truth or a lie, and 90 possible predictor variables for 
+each statement, which comes from the textual features we extracted earlier.
 
+```{r}
+# loack pre-processed df's
+load("stats_proc.Rda")
+
+```
+
+
+# EXAMPLE (Single Predictive Logistic Regression Model)
+
+As usual, let's begin with an example. Here we will simply train and test
+one single logistic regression model.
+
+## Split Sample Into Training and Testing Sets
+
+Our first step will be to split the entire dataset into two parts -- our training
+data set, on which the model will be build, and our testing data set, on which
+the performance of our model will be evaluated. Although many possible splits would be
+acceptable (e.g. 75-25, 90-10), we are going to conduct an exact 50-50 split,
+randomly allocating one half of the statements to the training set, and
+the other half to the testing set. The createDataPartition function in the 
+caret packages makes this easy (Kuhn, 2008).
+
+```{r}
+# partition data in 50-50 lgocv split (create index for test set)
+index_train_ex <- 
+  createDataPartition(y = stats_proc$stat_id,
+                      p = 0.50,
+                      times = 1,
+                      list = FALSE)
+
+# actually create data frame with training set (predictors and outcome together)
+train_set_ex <- stats_proc[index_train_ex, ]
+
+# actualy create data frame with test set (predictors and outcome together)
+test_set_ex <- stats_proc[-index_train_ex, ]
+
+```
+
+## Build Model (on Training Set)
+
+Now that the data are split, we can fit a logistic regression model to the training
+data. Again, the caret package makes this easy with its "train" function (Kuhn, 2008),
+which allows us to select from over 238 different model type (Kuhn, 2019; see:
+[Chapter 7](https://topepo.github.io/caret/train-models-by-tag.html), including
+of course the logistic regression model from the family of general lineal models.
+A single logistic regression model is fitted below.
+
+
+```{r}
+# start timer
+start_time <- Sys.time()
+
+# use caret "train" function to train logistic regression model
+model_ex <- 
+  train(form = grd_truth ~ . - stat_id,
+        data = train_set_ex,
+        method = "glm",
+        family = "binomial")
+
+# end timer
+total_time <- Sys.time() - start_time
+
+
+# display model summary
+model_ex
+
+```
+
+## Coefficients
+
+```{r coeff, fig.width=15, fig.height=15}
+
+log_ex <-  glm(data = train_set_ex,
+               formula = grd_truth ~ . - stat_id,
+               family = "binomial")
+
+plot_summs(log_ex)
+```
+
+```{r}
+ggcoef(log_ex)
+```
+
+
+
+## Evaluate Model (on Testing Set)
+
+
+```{r}
+# make predictions
+preds_ex <-
+  predict(object = model_ex,
+          newdata = test_set_ex,
+          type = "raw")
+      
+# record model performance
+conf_ex <-
+  confusionMatrix(data = preds_ex,
+                  reference = test_set_ex$grd_truth,
+                  positive = "truth")
+      
+# print confusion matrix
+conf_ex
+
+```
+
+# FULL (Predictive Logistic Regression Models)
+
+## Run 10 models
+
+```{r}
+# # -----------------------------------------------------------------------------
+# STEP 1: decide how many times to run the model
+rounds <- 10
+
+# -----------------------------------------------------------------------------
+# STEP 2: set up object to store results
+# part a: create names of results to store
+result_cols <- c("model_type", "round", "accuracy", "accuracy_LL", "accuracy_UL",
+                 "sensitivity", "specificity", "precision", "npv")
+
+# part b: create matrix
+results <-
+  matrix(nrow = rounds,
+         ncol = length(result_cols))
+
+# part c: actually name columns in results marix
+colnames(results) <- result_cols
+
+# part d: convert to df (so multiple variables of different types can be stored)
+results <- data.frame(results)
+
+# -----------------------------------------------------------------------------
+# STEP 2: start timer
+start_time <- Sys.time()
+
+# -----------------------------------------------------------------------------
+# STEP 3: create rounds number of models, and store results each time
+
+for (i in 1:rounds){
+  
+  # part a: partition data in 50-50 lgocv split (create index for test set)
+  index_train <- 
+    createDataPartition(y = stats_proc$stat_id,
+                        p = 0.50,
+                        times = 1,
+                        list = FALSE)
+  
+  # part b: create testing and training data sets
+  train_set <- stats_proc[index_train, ]
+  test_set <- stats_proc[-index_train, ]
+  
+  
+  # part c: use caret "train" function to train logistic regression model
+  model <- 
+    train(form = grd_truth ~ . - stat_id,
+          data = train_set,
+          method = "glm",
+          family = "binomial")
+  
+  # part d: make predictions
+  preds <-
+    predict(object = model,
+            newdata = test_set,
+            type = "raw")
+  
+  # part e: store model performance
+  conf_ex <-
+    confusionMatrix(data = preds,
+                    reference = test_set$grd_truth,
+                    positive = "truth")
+  
+  # part f: store model results
+  # model type
+  results[i, 1] <- "logistic"
+  # round
+  results[i, 2] <- i
+  # accuracy
+  results[i, 3] <- conf_ex$overall[1]
+  # accuracy LL
+  results[i, 4] <- conf_ex$overall[3]
+  # accuracy UL
+  results[i, 5] <- conf_ex$overall[4]
+  # sensitivity
+  results[i, 6] <- conf_ex$byClass[1]
+  # specificity
+  results[i, 7] <- conf_ex$byClass[2]
+  # precision
+  results[i, 8] <- conf_ex$byClass[3]
+  # negative predictive value
+  results[i, 9] <- conf_ex$byClass[4]
+  
+  # part g: print round and total elapsed time so far
+  cumul_time <- difftime(Sys.time(), start_time, units = "mins")
+  print(paste("round #", i, ": cumulative time ", round(cumul_time, 2), " mins",
+              sep = ""))
+  print("--------------------------------------")
+
+}
+
+```
+
+## View Results (Tabular)
+
+```{r}
+results
+  
+```
+
+## View Results
+
+```{r}
+results %>%
+  group_by(model_type) %>%
+  summarize(accuracy = mean(accuracy),
+         accuracy_LL = mean(accuracy_LL),
+         accuracy_UL = mean(accuracy_UL)) %>%
+  ggplot(aes(x = model_type,
+             y = accuracy)) +
+  geom_point(size = 2,
+             color = "#545EDF") +
+  geom_errorbar(aes(ymin = accuracy_LL,
+                     ymax = accuracy_UL),
+                color = "#545EDF",
+                width = 0.05,
+                size = 1) +
+  geom_hline(yintercept = 0.5,
+             linetype = "dashed",
+             size = 0.5,
+             color = "red") +
+  scale_y_continuous(breaks = seq(from = 0, to = 1, by = 0.05),
+                     limits = c(0, 1)) +
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.y = element_line(color = "grey",
+                                          size = 0.25),
+        panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        plot.title = element_text(hjust = 0.5),
+        axis.title.y = element_text(margin = 
+                                      margin(t = 0, r = 10, b = 0, l = 0)),
+        axis.title.x = element_text(margin = 
+                                      margin(t = 10, r = 00, b = 0, l = 0))) +
+  labs(title = "Accuracy by Model Type",
+       x = "Model Type",
+       y = "Overall Accuracy")
+
+```
+
+
+
+# OTHER ANALYSES
+
+
+## Load Data Used In These Analyses
 ```{r}
 # load all the nice tidy df's of features we created (remember stats_words has multiple dtm's)
 load("stats_all.Rda")
@@ -42,54 +307,8 @@ load("stats_pos.Rda")
 load("stats_sent.Rda")
 load("stats_complex.Rda")
 load("stats_words.Rda")
-
 ```
 
-
-# EXAMPLE (Single Predictive Logistic Regression Model)
-
-## Split Sample Into Training and Testing Sets
-
-```{r}
-# partition data in 50-50 lgocv split (create index for test set)
-log_ex_train_index <- 
-  createDataPartition(y = stats_all$stat_id,
-                      p = 0.50,
-                      times = 1,
-                      list = FALSE)
-
-# actually create data frame with training set (predictors and outcome together)
-log_ex_train <- stats_all[log_ex_train_index, ]
-
-# actualy create data frame with test set (predictors and outcome together)
-log_ex_test <- stats_all[-log_ex_train_index, ]
-
-```
-
-## Build Model
-
-```{r}
-# use caret "train" function to train logistic regression model
-log_ex_model <- 
-  train(form = grd_truth ~ . - stat_id,
-        data = log_ex_train,
-        method = "glm",
-        family = "binomial",
-        preProcess = c("center", "scale"))
-
-# display model summary
-log_ex_model
-
-attributes(log_ex_model)
-
-summary(log_ex_model$finalModel)
-
-```
-
-
-# FULL (Predictive Logistic Regression Models)
-
-# OTHER ANALYSES
 
 
 # Build Models
@@ -145,7 +364,7 @@ for (i in 1:num_feature_sets){
     feature_set_i <-
       feature_set_i %>%
         mutate(stat_id = as.integer(stat_id)) %>%
-        left_join(y = (stats_all %>%
+        left_join(y = (stats_all %>% # NOTE "stats_all" may be old variable name
                          select(stat_id,
                                 grd_truth)),
                   by = "stat_id")
@@ -417,5 +636,14 @@ save(results,
 Again, some chunks which take long to evaluate are not evaluating and instead saved/loaded from
 current directory. Rendering with: rmarkdown::render("hld_MODEL_logistic.Rmd")
 
+# Citations
+
+* Gelman, A., & Hill, J. (2006). Data analysis using regression and 
+multilevel/hierarchical models. Cambridge university press.
+
+* Kuhn, M. (2008). Building predictive models in R using the caret package. 
+Journal of Statistical Software, 28(5), 1-26.
+
+* Kuhn, M. (2019). The caret Package. Retrieved from https://topepo.github.io/caret/index.html
 
 # END
