@@ -9,25 +9,84 @@ output:
 
 [return to [overview page](./hld_OVERVIEW.html)]
 
-In this section, we will be building a support vector machine model.
+In this section, we will build a support vector machine (SVM) model to make
+truth and lie predictions on our statements. We turn to this technique because 
+it is one of the popular modeling methods in "machine learning". Kuhn & Johnson (2013, p.343) 
+state that SVMs have become "one of the most flexible and effective 
+machine learning tools available" since they were first developed by Vladimir Vapnik
+in the 1960s. Indeed, SVMs are used in countless research papers in the realm of
+computational social science and text analysis (e.g. Bakshy, Messing, & Adamic 
+(2015) use an SVM for news article classification in their highly cited paper 
+on selective news exposure on Facebook, and Wu et al. (2008) list it in their 
+article "Top 10 algorithms in data mining", a paper which itself has over 3,900 citations).
+
+I'm not going to pretend to have a deep understanding of the mathematics
+that underlie this model (obviously I don't). However, I will try to recapitulate
+the main intuitions from those, like Kuhn & Johnson (2013), who have tried to
+bring machine learning methods to a larger audience.
+
+In the figure below, Kuhn & Johnson (2013, p.344) have us imagine a case where we are
+using two predictor variables (i.e. Predictor A and Predictor B, along the x and y axes)
+to predict binary outcomes (i.e. classify/separate the red circles and blue squares).
+In cases where these two binary outcomes are perfectly seperable, an infinite number
+of lines can be generated that would indeed successfully separate these two classes (left panel).
+For each of these individual lines, we can imagine perpendicular lines radiating outwards
+from both ends. The distance that each of these lines can radiate outwards before
+they would bump into a data point is called the "margin". In each case, the bounds of 
+this margin are entirely determined by those nearest abutting data points, which are
+called "support vector" (because they sort of "support" the margin). In the simplest
+case, it is my understanding that support vector machines attempt to find the 
+
+This strategy can then be generalized to cases of higher dimensions (e.g. defining a plane in
+when we have 3 predictors and are thus working in three dimensions, etc). And further, in
+most cases, of course, the classes are not perfectly seperable and thus in finding our
+maximum margin classifier we can apply penalties as the number of misclassified data points increase.
+This introduces a new parameter that we must set for our model -- the cost, or penalty
+for misclassification. (There is no "correct" cost penalty, and these are usually determined
+through another process of training and testing "nested" within the training data set.
+A cost penality of 1 penalizes "hits" and "misses" equally. Larger cost penalties
+tend to result in more overfitting (Kuhn & Johnson, 2013, p.346-347).)
+
+![](./pics/kuhn_p344_svm.PNG)
+
+Further, we can move from creating linear classification boundaries (e.g. lines,
+planes, and hyperplances, etc) to non-linear classification boundaries through the
+use of a "kernel function", which takes our predictor variables and applies a
+non-linear transformation to them. Popular non-linear kernel functions include
+the polynomial, radial basis, and hyperbolic tangent functions (Kuhn & Johnson, 
+2013, p.347). Some of these kernel functions introduce additional parameters that
+we need to set for our model (e.g. we need to set a free parameter sigma, if using
+the radial basis function). 
+
+The different classification boundaries created by a non-linear support vector
+machine (which uses a radial basis function) is shown below as a function of
+different possible values of the tunning parameters.
+
+![](kuhn_p347_svm_nonlinear)
+
+Let's now implement a support vector machine to predict truths and lies in our
+dataset, using our textual features as predictors. I will use the a support
+vector machine with a radial basis function, as I would like to take advantage of
+SVMs ability to produce non-linear classification boundaries.
 
 # Packages
 
-Again, I will start by loading relevant packages.
+Let's make sure to load all the relevant packages.
 
 ```{r packages, message=FALSE, warning=FALSE}
 # before knitting: message = FALSE, warning = FALSE
 library(tidyverse) # cleaning and visualization
 library(caret) # modeling
+library(kernlab) # has sigest
 
 ```
 
 # Load Data
 
-Next, I will load the pre-processed data, which we created earlier
-(see [Data Cleaning & Pre-Processing](./hld_CLEAN.html)). This dataset has
-a row for each of 5,004 statements, a column indicating whether that particular
-statement was a truth or a lie, and 90 possible predictor variables for 
+Next, I will again load the pre-processed data, which we created earlier
+(see [Data Cleaning & Pre-Processing](./hld_CLEAN.html)). As a reminder,
+this dataset has a row for each of 5,004 statements, a column indicating whether 
+that particular statement was a truth or a lie, and 90 possible predictor variables for 
 each statement, which comes from the textual features we extracted earlier.
 
 ```{r load}
@@ -94,15 +153,52 @@ set.seed(2019)
 # start timer
 start_time <- Sys.time()
 
+# tuning parameters
+tune_params <- 
+
+# set up training 
+train_control_svm <- trainControl(method = "LGOCV",
+                                  number = 3)
+
+# get suggest sigma value
+# i take the median of the kernlab suggestions 
+# (default in caret is to take mean, exc)
+sigma_svm <- median(
+              kernlab::sigest(
+                as.matrix(train_set_ex 
+                            %>% select(
+                              -stat_id,
+                              -grd_truth)
+                          ),
+                scaled = TRUE
+                )
+              )
+
+
+
 # use caret "train" function to train logistic regression model
 model_ex <- 
   train(form = grd_truth ~ . - stat_id,
         data = train_set_ex,
-        method = "svmRadial")
+        method = "svmRadial"),
+        tuneGrid = expand.grid(# sigma = sigma_svm,
+                               C = c(1)),
+        trControl = trainControl(method = "LGOCV",
+                                  number = 3))
 
 # end timer
 total_time <- Sys.time() - start_time
 
+```
+
+
+```{r}
+attributes(model_ex)
+
+```
+
+```{r}
+model_ex$finalModel
 ```
 
 
@@ -362,6 +458,17 @@ save(model_ex,
 
 Again, some chunks which take long to evaluate are not evaluating and instead saved/loaded from
 current directory. Rendering with: rmarkdown::render("hld_MODEL_svm.Rmd")
+
+# Citations
+
+* Bakshy, E., Messing, S., & Adamic, L. A. (2015). Exposure to ideologically 
+diverse news and opinion on Facebook. Science, 348(6239), 1130-1132. 
+https://doi.org/10.1126/science.aaa1160
+
+* Kuhn, M., & Johnson, K. (2013). Applied predictive modeling (Vol. 26). Springer.
+
+* Wu, X., Kumar, V., Quinlan, J. R., Ghosh, J., Yang, Q., Motoda, H., . Philip, S. Y. (2008). 
+Top 10 algorithms in data mining. Knowledge and Information Systems, 14(1), 1-37.
 
 
 # END
