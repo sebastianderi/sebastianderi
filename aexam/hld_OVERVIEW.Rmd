@@ -35,7 +35,52 @@ hybrid configurations that incorporate both human and computational
 judgments. Their performance will be evaluated on a specific data set of textual
 truth and lie statements that I have collected. A bulk of the work will be in
 building a framework that parses the text and then builds a statistical model
-to predict truths and lies (i.e. creating and assessing the computer model). 
+to predict truths and lies (i.e. creating and assessing the computer model).
+
+We are less focused here on explanation. And our question is more akin to one
+about group decision making. However, here the groups consist not of the combination
+of different people but of the combination of different decision making agents:
+humans and computers. I believe that the resources of these different agents can
+be combined for more effective lie detection than either one is capable of alone.
+I believe this becuase all that is requred for a such a result is for the following
+conditions to hold: (1) computer models can be trained to predict lies better than
+chance, (2) humans can make predict lies better than chance, (3) the basis of these
+two predictions (computer and human predictions) are independent. This latter
+condition seems especially likely to be true, to me. Our computer models will
+be trained on very rudimentary textual features, while our humans will make
+judgements based on their knowledge of the word and personal experience (e.g. 
+"why would a person in that situation do that? seems like a lie") -- something
+which our computers certain do not have.
+
+# Sections
+
+That analysis is broken down into the following major sections, which
+build on each other sequentially.
+
+* [Data Generation](./hld_DATAGEN.html)
+* [Data Overview](./hld_DATAOVERVIEW.html)
+* Computer Performance
+    + [Feature Extraction](./hld_FEATURE_overview.html)
+        + [Statement Length](./hld_FEATURE_length.html)
+        + [Parts of Speech](./hld_FEATURE_pos.html)
+        + [Sentiment](./hld_FEATURE_sent.html)
+        + [Readability & Complexity](./hld_FEATURE_complex.html)
+        + [Bag of Words](./hld_FEATURE_words.html)
+    + [Data Cleaning & Pre-Processing](./hld_CLEAN.html)
+    + Modeling
+        + [Modeling Overview](./hld_MODEL_overview.html)
+        + [Logistic Regression](./hld_MODEL_logistic.html)
+        + [Support Vector Machines](./hld_MODEL_svm.html)
+        + [Neural Network](/.hld_MODEL_neural.html)
+        + [Comparison of All Models](./hld_MODEL_comparison.html)
+* [Human Performance](./hld_HUMAN_perf.html)
+* Hybrid Performance
+    + [Logistic Regression Hybrid Model](./hld_MODEL_logistic.html)
+    + [Support Vector Machine Hybrid Model](./hld_MODEL_svm.html)
+    + [Neural Network Hyrbid](/.hld_MODEL_neural.html)
+    + [Comparison of All Hybrid Models](./hld_MODEL_comparison.html)
+
+# Format
 
 The format of this report is such that it allows me to walk through
 the analysis process step by step. The exposition takes the form of a series of
@@ -56,29 +101,6 @@ Feel free to skip over any sections or notes that seem tedious or trivial.
 The construction of this document was a learning process for me,
 so if anything seems condescendingly simple, assuming it is because I am
 explaining or reminding myself of something.)
-
-That analysis is broken down into the following major sections, which
-build on each other sequentially.
-
-* [Data Generation](./hld_DATAGEN.html)
-* [Data Overview](./hld_DATAOVERVIEW.html)
-* Computer Performance
-    + [Feature Extraction](./hld_FEATURE_overview.html)
-        + [Statement Length](./hld_FEATURE_length.html)
-        + [Parts of Speech](./hld_FEATURE_pos.html)
-        + [Sentiment](./hld_FEATURE_sent.html)
-        + [Readability & Complexity](./hld_FEATURE_complex.html)
-        + [Bag of Words](./hld_FEATURE_words.html)
-    + [Data Cleaning & Pre-Processing](./hld_CLEAN.html)
-    + Modeling
-        + [Modeling Overview](./hld_MODEL_overview.html)
-        + [Logistic Regression](./hld_MODEL_logistic.html)
-        + [Support Vector Machines](./hld_MODEL_svm.html)
-        + [Neural Networks](/.hld_MODEL_neural.html)
-        + [Comparison of All Models](./hld_MODEL_comparison.html)
-* [Human Performance](./hld_HUMAN_perf.html)
-* Hybrid Performance
-
 
 # Resources
 

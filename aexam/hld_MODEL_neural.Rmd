@@ -1,5 +1,5 @@
 ---
-title: "Modeling (Support Vector Machine)"
+title: "Modeling (Neural Net)"
 author: Sebastian Deri
 output:
   html_document:
@@ -9,83 +9,170 @@ output:
 
 [return to [overview page](./hld_OVERVIEW.html)]
 
-I will now build a neural network predictive model.
+In this section, we will be building a support vector machine model.
 
-# Packages
 
-Again, I will start by loading relevant packages.
 
-```{r, message=FALSE, warning=FALSE}
+# Packages & Options
+
+Again, I will start by loading relevant packages. (I also am setting some other
+global background options, that will control how the output gets saved for
+future reuse and recreation of this document.)
+
+```{r packages, message=FALSE, warning=FALSE}
 # before knitting: message = FALSE, warning = FALSE
 library(tidyverse) # cleaning and visualization
-library(ggthemes) # visualization
 library(caret) # modeling
-library(AppliedPredictiveModeling)
-library(pROC) # ROC curve
+
+```
+
+```{r global_sets}
+# set cache=TRUE for whole document
+knitr::opts_chunk$set(cache = TRUE)
+
 ```
 
 
 # Load Data
 
-Next, I will load the various cleaned versions of the data we just
-created.
+Next, I will load the pre-processed data, which we created earlier
+(see [Data Cleaning & Pre-Processing](./hld_CLEAN.html)). This dataset has
+a row for each of 5,004 statements, a column indicating whether that particular
+statement was a truth or a lie, and 90 possible predictor variables for 
+each statement, which comes from the textual features we extracted earlier.
 
-```{r}
-# load all the nice tidy df's of features we created (remember stats_words has multiple dtm's)
-load("stats_all.Rda")
+```{r load}
+# load pre-processed df's
+load("stats_proc.Rda")
 
 ```
 
-## Step 1a: Split the Data (Index)
 
-```{r}
-# get index for random 50% of data, and count this as training data (rest will be test)
-index_neural <- createDataPartition(y = stats_all$grd_truth,
-                                 p = 0.50,
-                                 list = FALSE)
+# EXAMPLE (Single Support Vector Machine Model)
 
-# check length (should be 2502)
-length(index_neural)
+As usual, let's begin with an example. Here we will simply train and test
+one single logistic regression model.
+
+## Split Sample Into Training and Testing Sets
+
+Our first step will be to split the entire dataset into two parts -- our training
+data set, on which the model will be build, and our testing data set, on which
+the performance of our model will be evaluated. Although many possible splits would be
+acceptable (e.g. 75-25, 90-10), we are going to conduct an exact 50-50 split,
+randomly allocating one half of the statements to the training set, and
+the other half to the testing set. The createDataPartition function in the 
+caret packages makes this easy (Kuhn, 2008).
+
+```{r partition, cache = TRUE}
+# set seed, so that statistics don't keep changing for every analysis
+set.seed(2019)
+
+# partition data in 50-50 lgocv split (create index for test set)
+index_train_ex <- 
+  createDataPartition(y = stats_proc$stat_id,
+                      p = 0.50,
+                      times = 1,
+                      list = FALSE)
+
+# actually create data frame with training set (predictors and outcome together)
+train_set_ex <- stats_proc[index_train_ex, ]
+
+# actualy create data frame with test set (predictors and outcome together)
+test_set_ex <- stats_proc[-index_train_ex, ]
+
 ```
 
-## Step 1b: Split the Data (Actual Train and Test Set)
+## Build Model (on Training Set)
 
-```{r}
-train_neural <- stats_all[index_neural, ]
-test_neural <- stats_all[-index_neural, ]
-```
+Now that the data are split, we can fit a logistic regression model to the training
+data. Again, the caret package makes this easy with its "train" function (Kuhn, 2008),
+which allows us to select from over 238 different model type (Kuhn, 2019; see:
+[Chapter 7](https://topepo.github.io/caret/train-models-by-tag.html), including
+of course the logistic regression model from the family of general lineal models.
+A single logistic regression model is fitted below.
+
+Tune parametes (iterations set to 100 by default)
 
 
-```{r}
-# train model
+```{r nnet_ex, cache = TRUE}
+# set seed, so that statistics don't keep changing for every analysis
+# (applies for models which might have random parameters)
+set.seed(2019)
 
-nnetGrid <- expand.grid(.size = 1:10,
-                        .decay = c(0, .1, 1, 2))
-maxSize <- max(nnetGrid$.size)
-numWts <- (maxSize * (length(names(stats_all))) + maxSize + 1)
+# start timer
+start_time <- Sys.time()
 
-model_neural <-
-  train(x = train_neural[, !(names(train_neural) %in% c("stat_id", "grd_truth"))],
-        y = train_neural$grd_truth,
+# use caret "train" function to train logistic regression model
+model_ex <- 
+  train(form = grd_truth ~ . - stat_id,
+        data = train_set_ex,
         method = "nnet",
-        preProc = c("center", "scale", "spatialSign"),
-        # maxit = 2000,
-        trace = FALSE,
-        # MaxNWts = numWts,
-        tuneGrid = nnetGrid)
+        trace = FALSE) # don't print out after 
 
-# get predictions of model
-neural_predicts <-
-  predict(object = model_neural,
-          newdata = test_neural[, !(names(train_neural) %in% c("stat_id", "grd_truth"))])
+# end timer
+total_time <- Sys.time() - start_time
 
-# confusion matrix, with results
-confusionMatrix(neural_predicts, test_neural$grd_truth)
 ```
 
 
+## Evaluate Model (on Testing Set)
 
-```{r}
+Finally, let's see if our model is any good. To do this, we will use it to make
+predictions about the remaining 2,504 statments in the test set, which we set aside earlier.
+This is done below. The confusionMatrix function from the caret package provides an
+easy way to collect some basic statistics on how our model performed. As we can see
+from the text output of this function, our model did pretty well (Kuhn, 2008). 
+Its overall accuracy was 
+significantly better than chance: 60.7% [95% CI: 58.8, 62.6%]. And it performed
+well both in identifying truths (i.e. sensitivity: 58.2%) and identifying lies
+(i.e. specificity: 63.3%). When it made a prediction that a statement was a truth,
+it was correct more often than not (i.e. precision or positive predictive value:
+61.3%). And when it made a prediction that a statement was a lie, it was also
+correct more often than not (i.e. negative predictive value: 60.2%). (Confidence
+intervals can easily be generated for these other four statistics as well (i.e. +/-
+z\*(sqrt(p\*(1-p)/n), where z = 1.96 under the normal approximation method
+for calculating binomial proportion confidence intervals (Binomial proportion 
+confidence interval, 2019); I won't calculate these for this example, but I will 
+do so below in our full analysis.)
+
+(Note: some of the point statistics referenced throughout ths analys)
+
+
+```{r nnet_ex_conf, dependson='nnet_ex'}
+# make predictions
+preds_ex <-
+  predict(object = model_ex,
+          newdata = test_set_ex,
+          type = "raw")
+      
+# record model performance
+conf_ex <-
+  confusionMatrix(data = preds_ex,
+                  reference = test_set_ex$grd_truth,
+                  positive = "truth")
+      
+# print confusion matrix
+conf_ex
+
+```
+
+# FULL (Predictive Logistic Regression Models)
+
+Our full analysis will almost exactly replicate what we did in our example case
+above, except we will replicate the procedure ten times. Thus, we will build
+10 different logistic regression models using 10 different training sets and evaluate 
+them on their 10 different (corresponding) test sets.
+
+## Run 10 models
+
+Below is the code that runs through this modeling process 10 different times and
+saves the result from each round.
+
+```{r nnet_full, cache = TRUE}
+# # -----------------------------------------------------------------------------
+# STEP 0: set seed, so that statistics don't keep changing for every analysis
+set.seed(2019)
+
 # # -----------------------------------------------------------------------------
 # STEP 1: decide how many times to run the model
 rounds <- 10
@@ -94,7 +181,7 @@ rounds <- 10
 # STEP 2: set up object to store results
 # part a: create names of results to store
 result_cols <- c("model_type", "round", "accuracy", "accuracy_LL", "accuracy_UL",
-                 "sensitivity", "specificity", "precision", "npv")
+                 "sensitivity", "specificity", "precision", "npv", "n")
 
 # part b: create matrix
 results <-
@@ -142,30 +229,32 @@ for (i in 1:rounds){
             type = "raw")
   
   # part e: store model performance
-  conf_ex <-
+  conf_m <-
     confusionMatrix(data = preds,
                     reference = test_set$grd_truth,
                     positive = "truth")
   
   # part f: store model results
   # model type
-  results[i, 1] <- "logistic"
+  results[i, 1] <- "neural"
   # round
   results[i, 2] <- i
   # accuracy
-  results[i, 3] <- conf_ex$overall[1]
+  results[i, 3] <- conf_m$overall[1]
   # accuracy LL
-  results[i, 4] <- conf_ex$overall[3]
+  results[i, 4] <- conf_m$overall[3]
   # accuracy UL
-  results[i, 5] <- conf_ex$overall[4]
+  results[i, 5] <- conf_m$overall[4]
   # sensitivity
-  results[i, 6] <- conf_ex$byClass[1]
+  results[i, 6] <- conf_m$byClass[1]
   # specificity
-  results[i, 7] <- conf_ex$byClass[2]
+  results[i, 7] <- conf_m$byClass[2]
   # precision
-  results[i, 8] <- conf_ex$byClass[3]
+  results[i, 8] <- conf_m$byClass[3]
   # negative predictive value
-  results[i, 9] <- conf_ex$byClass[4]
+  results[i, 9] <- conf_m$byClass[4]
+  # sample size (of test set)
+  results[i, 10] <- sum(conf_m$table)
   
   # part g: print round and total elapsed time so far
   cumul_time <- difftime(Sys.time(), start_time, units = "mins")
@@ -177,8 +266,116 @@ for (i in 1:rounds){
 
 ```
 
+## View Results (Tabular)
+
+Below, I've displayed a raw tabular summary of the results from each of the 10 models.
+As we can see, the results vary somewhat from model to model (e.g. our first model
+had an overall accuracy of 60.7%, while our second model had an overall accuracy of
+60.2%), although are highly consistent (the variation in our overall performance of
+our best peforming model (round 6: 61.5%) and our worst performing model (round 9:
+59.4%) is less than 3%).
+
 ```{r}
 results
+  
 ```
 
+## View Results (Graphically)
 
+Let's visualize average performance across our 10 different models, on some of the
+key performance metrics. This is done below. As we can see, over 10 models,
+overall accuracy is above chance (with mean performance hovering just below 60%,
+and even the lower limit of the confidence interval on this estimate well above 55%).
+Similarly, the models performed above chance when predicting make predictions
+about statements that were truths and when making predictions about statements
+that were lies (confidence intervals for both sensitivity and specificity well
+above 50%). And the models were also more reliable than chance when making
+a prediction that a statment was a truth and when making a prediction that a
+statement was a lie (confidence intervals for precision and npv above 50%).
+These results are promising. They reveal that even basic textual features
+allow for deciphering of lies from truth.
+
+
+```{r}
+# calculate average sample size
+mean_n <- mean(results$n)
+
+# create df to use for visualization
+results_viz <-
+  results %>%
+  group_by(model_type) %>%
+  summarize(accuracy = mean(accuracy),
+            sensitivity = mean(sensitivity),
+            specificity = mean(specificity),
+            precision = mean(precision),
+            npv = mean(npv)) %>%
+  select(-model_type) %>%
+  gather(key = "perf_stat",
+         value = "value") %>%
+  mutate(value = as.numeric(value))
+
+# actual visualization
+ggplot(data = results_viz,
+  aes(x = perf_stat,
+           y = value)) +
+geom_point(size = 2,
+           color = "#545EDF") +
+geom_errorbar(aes(ymin = (value - 1.96*sqrt(value*(1-value)/mean_n)),
+                   ymax = (value + 1.96*sqrt(value*(1-value)/mean_n))),
+              color = "#545EDF",
+              width = 0.15,
+              size = 1.25) +
+geom_hline(yintercept = 0.5,
+           linetype = "dashed",
+           size = 0.5,
+           color = "red") +
+scale_y_continuous(breaks = seq(from = 0, to = 1, by = 0.05),
+                   limits = c(0, 1)) +
+scale_x_discrete(limits = rev(c("accuracy", "sensitivity", "specificity", 
+                            "precision", "npv"))) + 
+coord_flip() +
+theme(panel.grid.major.x = element_line(color = "grey",
+                                        size = 0.25),
+      panel.grid.minor.x = element_blank(),
+      panel.grid.major.y = element_blank(),
+      panel.background = element_blank(),
+      axis.ticks = element_blank(),
+      plot.title = element_text(hjust = 0.5),
+      axis.title.y = element_text(margin = 
+                                    margin(t = 0, r = 10, b = 0, l = 0)),
+      axis.title.x = element_text(margin = 
+                                    margin(t = 10, r = 00, b = 0, l = 0)),
+      axis.text.x = element_text(angle = 90)) +
+labs(title = "Performance Statistics (Neural Net)",
+     x = "Performance Statistic",
+     y = "Proportion (0 to 1)")
+
+
+```
+
+# Save Results
+
+```{r, eval = FALSE}
+# rename results df, to be particular to this model type (for disambiguation later)
+results_neural <- results
+
+# clear results variable
+rm(results)
+
+# again, we're going to kind of cheat here for easier rendering later 
+# (by saving the model_ex object from the sample; but let's rename it to avoid confusion)
+model_ex_neural <- model_ex
+
+# save results in Rda file
+save(model_ex_neural,
+     results_neural,
+     file = "results_neural.Rda")
+```
+
+# Render
+
+Again, some chunks which take long to evaluate are not evaluating and instead saved/loaded from
+current directory. Rendering with: rmarkdown::render("hld_MODEL_svm.Rmd")
+
+
+# END

@@ -15,7 +15,7 @@ In this section, we will be building a support vector machine model.
 
 Again, I will start by loading relevant packages.
 
-```{r, message=FALSE, warning=FALSE}
+```{r packages, message=FALSE, warning=FALSE}
 # before knitting: message = FALSE, warning = FALSE
 library(tidyverse) # cleaning and visualization
 library(caret) # modeling
@@ -30,9 +30,14 @@ a row for each of 5,004 statements, a column indicating whether that particular
 statement was a truth or a lie, and 90 possible predictor variables for 
 each statement, which comes from the textual features we extracted earlier.
 
-```{r}
+```{r load}
 # load pre-processed df's
 load("stats_proc.Rda")
+
+# For rendering, I'm going to cheat here and load results created when this model was first run
+# For some reason, chunks that were supposed to be caches when originally run are rerunning
+load("results_svm.Rda")
+results <- results_svm # change the specific named (renamed at end), back to generic name
 
 ```
 
@@ -52,7 +57,7 @@ randomly allocating one half of the statements to the training set, and
 the other half to the testing set. The createDataPartition function in the 
 caret packages makes this easy (Kuhn, 2008).
 
-```{r, cache = FALSE}
+```{r partition}
 # set seed, so that statistics don't keep changing for every analysis
 set.seed(2019)
 
@@ -81,7 +86,7 @@ of course the logistic regression model from the family of general lineal models
 A single logistic regression model is fitted below.
 
 
-```{r, cache = TRUE}
+```{r svm_ex, cache = TRUE, eval = FALSE}
 # set seed, so that statistics don't keep changing for every analysis
 # (applies for models which might have random parameters)
 set.seed(2019)
@@ -124,7 +129,7 @@ do so below in our full analysis.)
 (Note: some of the point statistics referenced throughout ths analys)
 
 
-```{r, cache = FALSE}
+```{r svm_ex_conf, cache = FALSE}
 # make predictions
 preds_ex <-
   predict(object = model_ex,
@@ -154,7 +159,7 @@ them on their 10 different (corresponding) test sets.
 Below is the code that runs through this modeling process 10 different times and
 saves the result from each round.
 
-```{r, cache = TRUE}
+```{r svm_full, cache = TRUE, eval = FALSE}
 # # -----------------------------------------------------------------------------
 # STEP 0: set seed, so that statistics don't keep changing for every analysis
 set.seed(2019)
@@ -340,15 +345,23 @@ labs(title = "Performance Statistics (Support Vector Machine)",
 
 # Save Results
 
-```{r}
+```{r, eval = FALSE}
 # rename results df, to be particular to this model type (for disambiguation later)
-results_log <- results
+results_svm <- results
 
 # clear results variable
-rm(results)
+ rm(results)
 
 # save results in Rda file
-save(results_log,
-     file = "results_log.Rda")
+save(model_ex,
+     results_svm,
+     file = "results_svm.Rda")
 ```
 
+# Render
+
+Again, some chunks which take long to evaluate are not evaluating and instead saved/loaded from
+current directory. Rendering with: rmarkdown::render("hld_MODEL_svm.Rmd")
+
+
+# END
