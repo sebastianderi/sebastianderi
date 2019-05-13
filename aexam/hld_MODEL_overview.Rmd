@@ -8,20 +8,77 @@ output:
 
 [return to [overview page](./hld_OVERVIEW.html)]
 
-Before building any specific models, it's worth discussing what these models
-aim to do and how they will be assessed. This is what I discuss here.
+Now that we are done cleaning and processing our data, we are ready to begin
+building models that can make predictions about whether individual statements 
+are truths or lies. Before building any of these specific models however, I
+will give an overview of  the general structure that this model building process 
+and how performance will be assessed in a way that allows
+comparison across different models.
 
-The models I will eventually create, will differ in a number of ways. But
-they will also share some core similarities, allowing for comparison
-between them. All of these models will take some set of features (e.g.
-sentiment, statement readability) and use those features to make a binary
-prediction about the truth or falsity of individual statements. In practice,
-for each model, this will entail dividing up the the full set of statements
-up into two groups: training and test. For example, in one model we may
-take 75% of the statements and use them to train a model to predict
-truths and lies based on the lengths of statements. The remaining 25% of
-the statements will be used to evaluate the model. That is, we will use the
-model to generate a prediction for each of the statements in the test set.
+Very basically, the modeling process will have two basic steps. In the first, we
+will use some method to split our dataset into two portions -- one for building or 
+"training" the model, and the other for testing the model. The golden rule in
+predictive modeling is to never use the same data that the model was built on to
+assess the model's performance. There are many different strategies for how to
+split the data into training and test sets. I will review these in the first part of this
+section ("Training and Testing (Data Splitting)"). Once the data is split, we 
+then need to assess the performance of the model. I will review these in the 
+second part of this section ("Assessment").
+
+# Training and Testing (Data Splitting)
+
+There are many different ways to split up the data. Which is best depends on the
+nature of the dataset and personal preference. Three major categories of data 
+splitting strategies are the following:
+
+* k-fold cross validation
+* repeated training/testing splits
+* bootstrapping
+
+## K-fold cross validation
+
+In k-fold cross validation, we divide our entire data set into mutually exclusive
+(disjoint) sets.
+
+A very common type of cross validation is 10-fold cross validation, where the data set is split
+into 10 sections, 
+
+![](./pics/kuhn_p71_kfold.PNG)
+
+## Repeated training/testing splits
+
+![](./pics/kuhn_p72_repeated.PNG)
+
+## Bootstrapping
+
+In bootstrapping we build our training and testing sets by sampling 
+
+![](./pics/kuhn_p73_bootstrap.PNG)
+
+## Procedure For Our Models
+
+To assess the models I create here, I will keep constant the method of data splitting.
+And I plat to use repeated training/testing splits. Specifically, for each model,
+I will randomly split the dataset into equal halves (50-50 split), allocating one half
+for training and the other half for testing. For each model type (e.g. logistic regression),
+I will do this ten times, and the average performance across these 10 models will be recorded. 
+This will consitute the official performance of that model type. 
+
+I prefer this technique for a few reasons. First, we have a fairly large amount of
+data (5,004 rows). So we don't have to worry about trying to use as much of our data
+as possible for training (we have enough data to spare). Although bootstrapping is
+a perfectly legitimate technique for data splitting, I don't like how it leaves open the
+possibility that the same observation may wind up in both the training and test set.
+Further, bootstrapping is particularly useful in cases where data is limited (e.g.
+fewer number of observations), which is not the case here. That leaves a choice
+between k-fold cross validation and repeated testing/training splits. 
+
+
+Let's now discuss the different ways that model performance can be assessed.
+
+
+# Assessment
+
 Once this is done, we can assess the performance of that model in a number of
 ways. I now discuss some of the primary metrics we can use to assess
 model performance. An important (and I believe interesting) fact to take note
@@ -42,7 +99,7 @@ such as a person's future earnings based on their educational experience
 and standardized test scores.)
 
 
-# Overall Accuracy
+## Overall Accuracy
 
 First, and most obviously, the easiest and most central way that each model
 will be assessed, will be by it's overall accuracy. That is, we count up
@@ -329,6 +386,9 @@ these include:
 * ROC curves
 * AUC (area under the curve)
 * Calibration Plots
+
+
+
 
 # Citations
 

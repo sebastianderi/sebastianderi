@@ -1,0 +1,79 @@
+---
+title: "Modeling Comparison"
+author: Sebastian Deri
+output:
+  html_document:
+    df_print: paged
+    code_folding: show
+---
+
+[return to [overview page](./hld_OVERVIEW.html)]
+
+Let's now compare the performance of the various different models we created.
+
+# Packages
+
+Again, I will start by loading relevant packages.
+
+```{r, message=FALSE, warning=FALSE}
+# before knitting: message = FALSE, warning = FALSE
+library(tidyverse) # cleaning and visualization
+library(ggthemes) # visualization
+library(caret) # modeling
+library(broom) # needed for ggcoef function
+library(GGally) # has ggcoef function
+library(AppliedPredictiveModeling)
+library(pROC) # ROC curve
+
+```
+
+# Load Data
+
+I will now load the summary results from each of the different models we created
+in the earlier sections.
+
+```{r}
+# load results df's from each of the models we created
+
+```
+
+# Comparison (Overall Accuracy)
+
+```{r}
+results %>%
+  group_by(model_type) %>%
+  summarize(accuracy = mean(accuracy),
+         accuracy_LL = mean(accuracy_LL),
+         accuracy_UL = mean(accuracy_UL)) %>%
+  ggplot(aes(x = model_type,
+             y = accuracy)) +
+  geom_point(size = 2,
+             color = "#545EDF") +
+  geom_errorbar(aes(ymin = accuracy_LL,
+                     ymax = accuracy_UL),
+                color = "#545EDF",
+                width = 0.05,
+                size = 1) +
+  geom_hline(yintercept = 0.5,
+             linetype = "dashed",
+             size = 0.5,
+             color = "red") +
+  scale_y_continuous(breaks = seq(from = 0, to = 1, by = 0.05),
+                     limits = c(0, 1)) +
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.y = element_line(color = "grey",
+                                          size = 0.25),
+        panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        plot.title = element_text(hjust = 0.5),
+        axis.title.y = element_text(margin = 
+                                      margin(t = 0, r = 10, b = 0, l = 0)),
+        axis.title.x = element_text(margin = 
+                                      margin(t = 10, r = 00, b = 0, l = 0))) +
+  labs(title = "Accuracy by Model Type",
+       x = "Model Type",
+       y = "Overall Accuracy")
+
+```
+

@@ -78,6 +78,16 @@ stats_raw <-
 # print joined df
 stats_raw
 
+# remoe other df (for memory)
+rm(stats_length,
+   stats_pos,
+   stats_sent,
+   stats_complex,
+   stats_dtm_10,
+   stats_dtm_25,
+   stats_dtm_50,
+   stats_dtm_100)
+
 ```
 
 
@@ -112,7 +122,7 @@ And the variables with zero or near zero variance simply won't be very useful
 for prediction. Let's go about adjusting our data a bit to account for this.
 
 
-```{r hists, fig.width = 10, fig.height=26}
+```{r hist_raw, fig.width = 10, fig.height=26}
 stats_raw %>%
   select(-stat_id) %>%
   keep(is.numeric) %>% 
@@ -134,6 +144,7 @@ stats_raw %>%
     theme(legend.position="top")
 
 ```
+
 
 ## Skew
 
@@ -244,7 +255,7 @@ with our now winsorized variables. From looking at these distributions, we see t
 the situation is improved from before, but certainly not perfect. Let's move on to
 our next problem.
 
-```{r hists, fig.width = 10, fig.height=26}
+```{r hist_winsorized, fig.width = 10, fig.height=26}
 stats_proc %>%
   select(-stat_id) %>%
   keep(is.numeric) %>% 
@@ -266,7 +277,6 @@ stats_proc %>%
     theme(legend.position="top")
 
 ```
-
 
 
 ## Zero or Near Zero Variance (Identify)
@@ -324,7 +334,7 @@ Again, let's check what we are left with. As we can see, we still have some
 predictors with pretty unequal bins. But at least our worst offenders have been
 removed.
 
-```{r hists, fig.width = 10, fig.height=26}
+```{r hist_nzv, fig.width = 10, fig.height=26}
 stats_proc %>%
   select(-stat_id) %>%
   keep(is.numeric) %>% 
@@ -346,6 +356,7 @@ stats_proc %>%
     theme(legend.position="top")
 
 ```
+
 
 ## Collinearity
 
@@ -381,6 +392,10 @@ an even smaller box for the readability features ("read_FLESCH", "read_FOG"), fo
 by the very largest box for all the individual words ("wrd_I", "wrd_AND", ...).
 As we suspected, the two readability features are highly (negatively) correlated.
 Further, we see that the statement length metrics ("n_words", "n_unique", "n_unique_prop")
+are fairly highly correlated with a number of variables (follow along vertically the
+three bottom-most rows or the the three left-most columns horizontally). Finally,
+all the individual words are somewhat correlated with each other, but not overwhelmingly
+so.
 
 ```{r, fig.width = 17, fig.height=17}
 # get correlations
@@ -398,35 +413,59 @@ ggcorrplot(feature_cors,
         panel.grid.major.x = element_blank())
 ```
 
+## Collinearity (Candidates for Elimination)
 
-## Collinearity (Eliminating)
+Now let's go about eliminating any variables with problematically high correlations
+with the other variables. We will use the algorithm describes above (with a cutoff of 
+0.70). This suggest for deletion four variables: read_FOG, n_words, n_unique, and
+sent_POS. These confirm what we might have suspected from our visual inspection and
+prior knowledge. We knew the two readability metrics were highly correlated (and so one,
+the FOG index, was suggested for deletion.) As we saw in the correlation matrix,
+the statement length metrics were highly correlated with a number of variables,
+and so they are suggested for deletion. (Likely, many of the counts of individual words
+are often also a fair proxy for the length of those statements, as certain words occur
+with great frequency as and regularity as we saw earlier. Although, we had some theoretical reasons
+for including statement length metrics, I am okay deleting them. It seems some of the
+other variables already account for a large portion of the variance that these variables
+pick up. Thus, if statement length is important, it's not like our model won't have
+features which account for this.) Finally, one of the sentiment features ("sent_POS") was
+suggested for deletion. Remember, we computed overall number of negative words ("sent_NEG"),
+overall number of positive words ("sent_POS"), and then net sentiment, the difference between
+these two ("sent_NET"). This means "sent_POS" and "sent_NEG" will be highly correlated with
+"sent_NET" -- meaning that either of the two or "sent_NET" might be suggested for deletion.
+The algorithm suggested "sent_POS".
 
-```{r, eval=FALSE}
-# select only predictor variables (i.e. get rid of stat_id and grd_truth columns)
-stats_allclean_x <- subset(stats_allclean,
-                           select = -c(stat_id, grd_truth))
 
-
+```{r}
 # find high correlations
-high_corr_indices <- findCorrelation(x = cor(stats_allclean_x),
-                                     cutoff = 0.75)
+high_corr_names <- findCorrelation(x = cor(stats_proc %>% select(-stat_id, -grd_truth)),
+                                     cutoff = 0.70,
+                                     names = TRUE)
 
-# find names of those columns with high correlations
-high_corr_names <- names(stats_allclean_x)[high_corr_indices]
-                        
+# print names of columns suggested for deletion
+high_corr_names
 
-# eliminate high correlation columns from cleaned dataset
-stats_allclean <-
-  stats_allclean %>%
-  select(-high_corr_names)
 ```
 
+Collinearity (Actual Elimination)
 
+To deal with possible problems of collinearity, let's delete these four variables 
+suggested by the algorithm. We now wind up with a total of 92 predictor variables.
+
+```{r}
+# eliminate high correlation columns from cleaned dataset
+stats_proc <- 
+  stats_proc[ , !(names(stats_proc) %in% high_corr_names)]
+
+# print remaining data frame
+stats_proc
+```
 
 
 # Transforming Data
 
-Finally, I will transform the data to ease interpretation and allow for better comparison
+This is the end of the housecleaning. But as a last step, I would like to
+transform the data to ease interpretation and allow for better comparison
 in later analyses. Specifically, I am going to center and
 rescale all predictor variables (i.e. features we previously extracted). First,
 I will center all variables around their mean -- i.e. for each variable, compute its
@@ -437,26 +476,60 @@ each column by the standard deviation of that column, so that deviations between
 variables are comparable. Thus, for any variable, a value like 0.5 will 
 mean the same thing -- that value is 0.5 standard deviations above the mean for 
 that feature. Luckily, the preProcess function in the caret package (Kuhn, 2008) 
-makes this extremely easy.
+makes this extremely easy. (Of course, many of variables are still notably skewed
+or uneven, so some of this centering and scaling could lead to misleading interpretations.
+However, this process still imposes some more uniformity on our data. And we can
+keep in mind the caveat just noted in our subsequent interpretations.)
 
-```{r, eval=FALSE}
+```{r}
 # center and scale with preProcess and predict from caret
-stats_allclean <- 
-  predict(newdata = stats_all,
-          preProcess(x = subset(stats_all,
-                                select = -c(stat_id, grd_truth)),
+stats_proc <- 
+  predict(newdata = stats_proc,
+          preProcess(x = stats_proc %>% select(-stat_id, -grd_truth),
                      method = c("center", "scale")))
 
-# print centered and scales data frame
-stats_allclean
+# print centered and scales data frame 
+# stats_proc # (turned off, bc it makes knitr exceed pandoc memory limits)
 
 ```
 
 
+# Final Visualization
+
+With all cleaning, transforming and other pre-processing complete, let's have
+one final look at the distributions of our remaining processed variables 
+(to make sure we didn't mess anything up in that last step).
+
+```{r hist_final, fig.width = 10, fig.height=26}
+stats_proc %>%
+  select(-stat_id) %>%
+  keep(is.numeric) %>% 
+  gather(key = "variable",
+         value = "value") %>%
+  mutate(feature_type = case_when(grepl("^n_", variable) ~ "length",
+                                  grepl("^pos_", variable) ~ "part_of_speech",
+                                  grepl("^sent_", variable) ~ "sentiment",
+                                  grepl("^read_", variable) ~ "complexity",
+                                  grepl("^wrd_", variable) ~ "word")) %>%
+  ggplot(aes(x = value,
+             fill = feature_type)) +
+    facet_wrap(~ variable,
+               ncol = 7,
+               scales = "free") +
+    geom_histogram() +
+    scale_fill_discrete(breaks=c("length", "part_of_speech", "complexity",
+                                 "sentiment", "word")) +
+    theme(legend.position="top")
+
+```
+
 
 # Save
 
-```{r, eval=FALSE}
+And lastly, let's save both the raw version of the full data set we created in the 
+beginning and the processed version of the data we just finished creating.
+
+```{r}
 # save the raw and various cleaned data objects
 save(stats_raw,
      stats_proc,

@@ -85,4 +85,100 @@ confusionMatrix(neural_predicts, test_neural$grd_truth)
 
 
 
+```{r}
+# # -----------------------------------------------------------------------------
+# STEP 1: decide how many times to run the model
+rounds <- 10
+
+# -----------------------------------------------------------------------------
+# STEP 2: set up object to store results
+# part a: create names of results to store
+result_cols <- c("model_type", "round", "accuracy", "accuracy_LL", "accuracy_UL",
+                 "sensitivity", "specificity", "precision", "npv")
+
+# part b: create matrix
+results <-
+  matrix(nrow = rounds,
+         ncol = length(result_cols))
+
+# part c: actually name columns in results marix
+colnames(results) <- result_cols
+
+# part d: convert to df (so multiple variables of different types can be stored)
+results <- data.frame(results)
+
+# -----------------------------------------------------------------------------
+# STEP 2: start timer
+start_time <- Sys.time()
+
+# -----------------------------------------------------------------------------
+# STEP 3: create rounds number of models, and store results each time
+
+for (i in 1:rounds){
+  
+  # part a: partition data in 50-50 lgocv split (create index for test set)
+  index_train <- 
+    createDataPartition(y = stats_proc$stat_id,
+                        p = 0.50,
+                        times = 1,
+                        list = FALSE)
+  
+  # part b: create testing and training data sets
+  train_set <- stats_proc[index_train, ]
+  test_set <- stats_proc[-index_train, ]
+  
+  
+  # part c: use caret "train" function to train logistic regression model
+  model <- 
+    train(form = grd_truth ~ . - stat_id,
+          data = train_set,
+          method = "nnet",
+          trace = FALSE)
+  
+  # part d: make predictions
+  preds <-
+    predict(object = model,
+            newdata = test_set,
+            type = "raw")
+  
+  # part e: store model performance
+  conf_ex <-
+    confusionMatrix(data = preds,
+                    reference = test_set$grd_truth,
+                    positive = "truth")
+  
+  # part f: store model results
+  # model type
+  results[i, 1] <- "logistic"
+  # round
+  results[i, 2] <- i
+  # accuracy
+  results[i, 3] <- conf_ex$overall[1]
+  # accuracy LL
+  results[i, 4] <- conf_ex$overall[3]
+  # accuracy UL
+  results[i, 5] <- conf_ex$overall[4]
+  # sensitivity
+  results[i, 6] <- conf_ex$byClass[1]
+  # specificity
+  results[i, 7] <- conf_ex$byClass[2]
+  # precision
+  results[i, 8] <- conf_ex$byClass[3]
+  # negative predictive value
+  results[i, 9] <- conf_ex$byClass[4]
+  
+  # part g: print round and total elapsed time so far
+  cumul_time <- difftime(Sys.time(), start_time, units = "mins")
+  print(paste("round #", i, ": cumulative time ", round(cumul_time, 2), " mins",
+              sep = ""))
+  print("--------------------------------------")
+
+}
+
+```
+
+```{r}
+results
+```
+
 

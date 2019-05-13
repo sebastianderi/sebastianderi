@@ -73,11 +73,9 @@ build on each other sequentially.
     + Modeling
         + [Modeling Overview](./hld_MODEL_overview.html)
         + [Logistic Regression](./hld_MODEL_logistic.html)
-        + Neural Networks
-        + Support Vector Machines
-        + Rules Based Models
-        + Tree Based Model (e.g. Random Forest)
-        + K-Nearest Neighbors
+        + [Support Vector Machines](./hld_MODEL_svm.html)
+        + [Neural Networks](/.hld_MODEL_neural.html)
+        + [Comparison of All Models](./hld_MODEL_comparison.html)
 * [Human Performance](./hld_HUMAN_perf.html)
 * Hybrid Performance
 

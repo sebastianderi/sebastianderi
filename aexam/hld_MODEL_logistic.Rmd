@@ -25,9 +25,8 @@ Again, I will start by loading relevant packages.
 library(tidyverse) # cleaning and visualization
 library(ggthemes) # visualization
 library(caret) # modeling
-library(jtools) # for visualizing coefficients
-library(ggstance) # i think need for plot_coeffs function used by jtools
-library(broom) # has ggcoef function
+library(broom) # needed for ggcoef function
+library(GGally) # has ggcoef function
 library(AppliedPredictiveModeling)
 library(pROC) # ROC curve
 
@@ -42,7 +41,7 @@ statement was a truth or a lie, and 90 possible predictor variables for
 each statement, which comes from the textual features we extracted earlier.
 
 ```{r}
-# loack pre-processed df's
+# load pre-processed df's
 load("stats_proc.Rda")
 
 ```
@@ -63,7 +62,10 @@ randomly allocating one half of the statements to the training set, and
 the other half to the testing set. The createDataPartition function in the 
 caret packages makes this easy (Kuhn, 2008).
 
-```{r}
+```{r, cache = FALSE}
+# set seed, so that statistics don't keep changing for every analysis
+set.seed(2019)
+
 # partition data in 50-50 lgocv split (create index for test set)
 index_train_ex <- 
   createDataPartition(y = stats_proc$stat_id,
@@ -89,7 +91,11 @@ of course the logistic regression model from the family of general lineal models
 A single logistic regression model is fitted below.
 
 
-```{r}
+```{r, cache = FALSE}
+# set seed, so that statistics don't keep changing for every analysis
+# (applies for models which might have random parameters)
+set.seed(2019)
+
 # start timer
 start_time <- Sys.time()
 
@@ -103,33 +109,58 @@ model_ex <-
 # end timer
 total_time <- Sys.time() - start_time
 
-
-# display model summary
-model_ex
-
 ```
 
 ## Coefficients
 
+In logistic regression, we model the log odds of a binary event (i.e. log(p/(1-p)))
+as a linear combination of our chosen predictor variables (with some arithmetic, we
+can then convert things so we are estimating raw probabilites, from 0 to 1) 
+(Gelman & Hill (2006), Chapter 5; Logistic regression 2019).
+Normally, our focus would be on interpreting the coefficients of the individual 
+predictor variables in this resulting model -- for insight into what sorts of factors 
+explains the occurrence of our binary outcome. These are shown below (with 95% CI's) 
+in decreasing order. 
+
+However, our focus in this context is in simply using this entire model to make
+new out of sample predictions. (Our entire model is basically an "equation",
+where we can plug in values for each feature, multiple that value by the coefficient
+from the equation and generate a probability estimate of a statement being a lie.
+We can then use this probability estimate to make a prediction about whether a
+statement is a lie; i.e. if predicted probability of lie is greater than 50%, predict
+lie, otherwise predict truth. This is what we will do below, 2504 times for each
+of the 2504 statements in the testing set).
+
 ```{r coeff, fig.width=15, fig.height=15}
-
-log_ex <-  glm(data = train_set_ex,
-               formula = grd_truth ~ . - stat_id,
-               family = "binomial")
-
-plot_summs(log_ex)
+# use ggcoef from GGally, that allows for nice plotting of coeffs
+ggcoef(model_ex$finalModel,
+       sort = "decending")
 ```
-
-```{r}
-ggcoef(log_ex)
-```
-
-
 
 ## Evaluate Model (on Testing Set)
 
+Finally, let's see if our model is any good. To do this, we will use it to make
+predictions about the remaining 2,504 statments in the test set, which we set aside earlier.
+This is done below. The confusionMatrix function from the caret package provides an
+easy way to collect some basic statistics on how our model performed. As we can see
+from the text output of this function, our model did pretty well (Kuhn, 2008). 
+Its overall accuracy was 
+significantly better than chance: 60.7% [95% CI: 58.8, 62.6%]. And it performed
+well both in identifying truths (i.e. sensitivity: 58.2%) and identifying lies
+(i.e. specificity: 63.3%). When it made a prediction that a statement was a truth,
+it was correct more often than not (i.e. precision or positive predictive value:
+61.3%). And when it made a prediction that a statement was a lie, it was also
+correct more often than not (i.e. negative predictive value: 60.2%). (Confidence
+intervals can easily be generated for these other four statistics as well (i.e. +/-
+z\*(sqrt(p\*(1-p)/n), where z = 1.96 under the normal approximation method
+for calculating binomial proportion confidence intervals (Binomial proportion 
+confidence interval, 2019); I won't calculate these for this example, but I will 
+do so below in our full analysis.)
 
-```{r}
+(Note: some of the point statistics referenced throughout ths analys)
+
+
+```{r, cache = FALSE}
 # make predictions
 preds_ex <-
   predict(object = model_ex,
@@ -149,9 +180,21 @@ conf_ex
 
 # FULL (Predictive Logistic Regression Models)
 
+Our full analysis will almost exactly replicate what we did in our example case
+above, except we will replicate the procedure ten times. Thus, we will build
+10 different logistic regression models using 10 different training sets and evaluate 
+them on their 10 different (corresponding) test sets.
+
 ## Run 10 models
 
-```{r}
+Below is the code that runs through this modeling process 10 different times and
+saves the result from each round.
+
+```{r, cache = FALSE}
+# # -----------------------------------------------------------------------------
+# STEP 0: set seed, so that statistics don't keep changing for every analysis
+set.seed(2019)
+
 # # -----------------------------------------------------------------------------
 # STEP 1: decide how many times to run the model
 rounds <- 10
@@ -160,7 +203,7 @@ rounds <- 10
 # STEP 2: set up object to store results
 # part a: create names of results to store
 result_cols <- c("model_type", "round", "accuracy", "accuracy_LL", "accuracy_UL",
-                 "sensitivity", "specificity", "precision", "npv")
+                 "sensitivity", "specificity", "precision", "npv", "n")
 
 # part b: create matrix
 results <-
@@ -208,7 +251,7 @@ for (i in 1:rounds){
             type = "raw")
   
   # part e: store model performance
-  conf_ex <-
+  conf_m <-
     confusionMatrix(data = preds,
                     reference = test_set$grd_truth,
                     positive = "truth")
@@ -219,19 +262,21 @@ for (i in 1:rounds){
   # round
   results[i, 2] <- i
   # accuracy
-  results[i, 3] <- conf_ex$overall[1]
+  results[i, 3] <- conf_m$overall[1]
   # accuracy LL
-  results[i, 4] <- conf_ex$overall[3]
+  results[i, 4] <- conf_m$overall[3]
   # accuracy UL
-  results[i, 5] <- conf_ex$overall[4]
+  results[i, 5] <- conf_m$overall[4]
   # sensitivity
-  results[i, 6] <- conf_ex$byClass[1]
+  results[i, 6] <- conf_m$byClass[1]
   # specificity
-  results[i, 7] <- conf_ex$byClass[2]
+  results[i, 7] <- conf_m$byClass[2]
   # precision
-  results[i, 8] <- conf_ex$byClass[3]
+  results[i, 8] <- conf_m$byClass[3]
   # negative predictive value
-  results[i, 9] <- conf_ex$byClass[4]
+  results[i, 9] <- conf_m$byClass[4]
+  # sample size (of test set)
+  results[i, 10] <- sum(conf_m$table)
   
   # part g: print round and total elapsed time so far
   cumul_time <- difftime(Sys.time(), start_time, units = "mins")
@@ -245,57 +290,131 @@ for (i in 1:rounds){
 
 ## View Results (Tabular)
 
+Below, I've displayed a raw tabular summary of the results from each of the 10 models.
+As we can see, the results vary somewhat from model to model (e.g. our first model
+had an overall accuracy of 60.7%, while our second model had an overall accuracy of
+60.2%), although are highly consistent (the variation in our overall performance of
+our best peforming model (round 6: 61.5%) and our worst performing model (round 9:
+59.4%) is less than 3%).
+
 ```{r}
 results
   
 ```
 
-## View Results
+## View Results (Graphically)
+
+Let's visualize average performance across our 10 different models, on some of the
+key performance metrics. This is done below. As we can see, over 10 models,
+overall accuracy is above chance (with mean performance hovering just below 60%,
+and even the lower limit of the confidence interval on this estimate well above 55%).
+Similarly, the models performed above chance when predicting make predictions
+about statements that were truths and when making predictions about statements
+that were lies (confidence intervals for both sensitivity and specificity well
+above 50%). And the models were also more reliable than chance when making
+a prediction that a statment was a truth and when making a prediction that a
+statement was a lie (confidence intervals for precision and npv above 50%).
+These results are promising. They reveal that even basic textual features
+allow for deciphering of lies from truth.
+
 
 ```{r}
-results %>%
+# calculate average sample size
+mean_n <- mean(results$n)
+
+# create df to use for visualization
+results_viz <-
+  results %>%
   group_by(model_type) %>%
   summarize(accuracy = mean(accuracy),
-         accuracy_LL = mean(accuracy_LL),
-         accuracy_UL = mean(accuracy_UL)) %>%
-  ggplot(aes(x = model_type,
-             y = accuracy)) +
-  geom_point(size = 2,
-             color = "#545EDF") +
-  geom_errorbar(aes(ymin = accuracy_LL,
-                     ymax = accuracy_UL),
-                color = "#545EDF",
-                width = 0.05,
-                size = 1) +
-  geom_hline(yintercept = 0.5,
-             linetype = "dashed",
-             size = 0.5,
-             color = "red") +
-  scale_y_continuous(breaks = seq(from = 0, to = 1, by = 0.05),
-                     limits = c(0, 1)) +
-  theme(panel.grid.major.x = element_blank(),
-        panel.grid.minor.x = element_blank(),
-        panel.grid.major.y = element_line(color = "grey",
-                                          size = 0.25),
-        panel.background = element_blank(),
-        axis.ticks = element_blank(),
-        plot.title = element_text(hjust = 0.5),
-        axis.title.y = element_text(margin = 
-                                      margin(t = 0, r = 10, b = 0, l = 0)),
-        axis.title.x = element_text(margin = 
-                                      margin(t = 10, r = 00, b = 0, l = 0))) +
-  labs(title = "Accuracy by Model Type",
-       x = "Model Type",
-       y = "Overall Accuracy")
+            sensitivity = mean(sensitivity),
+            specificity = mean(specificity),
+            precision = mean(precision),
+            npv = mean(npv)) %>%
+  select(-model_type) %>%
+  gather(key = "perf_stat",
+         value = "value") %>%
+  mutate(value = as.numeric(value))
+
+# actual visualization
+ggplot(data = results_viz,
+  aes(x = perf_stat,
+           y = value)) +
+geom_point(size = 2,
+           color = "#545EDF") +
+geom_errorbar(aes(ymin = (value - 1.96*sqrt(value*(1-value)/mean_n)),
+                   ymax = (value + 1.96*sqrt(value*(1-value)/mean_n))),
+              color = "#545EDF",
+              width = 0.15,
+              size = 1.25) +
+geom_hline(yintercept = 0.5,
+           linetype = "dashed",
+           size = 0.5,
+           color = "red") +
+scale_y_continuous(breaks = seq(from = 0, to = 1, by = 0.05),
+                   limits = c(0, 1)) +
+scale_x_discrete(limits = rev(c("accuracy", "sensitivity", "specificity", 
+                            "precision", "npv"))) + 
+coord_flip() +
+theme(panel.grid.major.x = element_line(color = "grey",
+                                        size = 0.25),
+      panel.grid.minor.x = element_blank(),
+      panel.grid.major.y = element_blank(),
+      panel.background = element_blank(),
+      axis.ticks = element_blank(),
+      plot.title = element_text(hjust = 0.5),
+      axis.title.y = element_text(margin = 
+                                    margin(t = 0, r = 10, b = 0, l = 0)),
+      axis.title.x = element_text(margin = 
+                                    margin(t = 10, r = 00, b = 0, l = 0)),
+      axis.text.x = element_text(angle = 90)) +
+labs(title = "Performance Statistics (Logistic Regression)",
+     x = "Performance Statistic",
+     y = "Proportion (0 to 1)")
+
 
 ```
 
+# Save Results
+
+```{r}
+# rename results df, to be particular to this model type (for disambiguation later)
+results_log <- results
+
+# clear results variable
+rm(results)
+
+# save results in Rda file
+save(results_log,
+     file = "results_log.Rda")
+```
 
 
 # OTHER ANALYSES
 
+Finally, out of curiosity, I wanted to conduct one other analysis. I wanted to
+examine how the predictive performance of the models was affected by what
+percentage of the overall data it was trained on. In the analyses above (and
+for the other models we will build) we relied on repeated training/testing splits,
+where we split the dataset exaclty in half each time (50-50 split). However, I
+was curious to know if performance might vary depending on how we conducted this split.
+It was my suspicion that there would be diminishing returns to the amount of data
+that the model was trained on. (That is, after a certain point, the models
+wouldn't perform better if given a larger portion of the overall data to train on.)
+To do this, I evaluated performance under differing splitting strategies, ranging from
+splits as as extreme as 1% of data used for traing and 99% for testing, to 50%-50% splits,
+up until splits of 90% for training and 10% for testing.
 
 ## Load Data Used In These Analyses
+
+I actually conducted this analysis in earlier iteration of preparing this report,
+before I had fully pre-processed and cleaned the data. Thus, this analysis was
+conducted on the raw uncleaned features. At the point I conducted this analysis,
+I was also curious to separate out performance by different features (e.g. training
+models just on the sentiment features, or just on the parts of speech, etc).
+Thus, to begin this analysis, I need to load in the raw data (from an older raw
+data file) as well as the raw data for each of the individual feature sets.
+
 ```{r}
 # load all the nice tidy df's of features we created (remember stats_words has multiple dtm's)
 load("stats_all.Rda")
@@ -307,14 +426,55 @@ load("stats_pos.Rda")
 load("stats_sent.Rda")
 load("stats_complex.Rda")
 load("stats_words.Rda")
+
+# so, load the results I generated and saved when I ran these analyses earlier
+# (note that that this should have a different "results" df, which we can use
+# instead of halving to regenerate the 960 models created just below)
+load("log_results1.Rda")
 ```
 
 
+## Build Models
 
-# Build Models
+My analytic plan was to run through the following training-test splits:
 
-This took half an hour to run (although, it did involve created and storing
-the results from 960 separate models).
+Training Proportion	| Testing Proportion	
+-------- | ----------------- 
+1%	| 99%
+2%	| 98%
+5% | 95%
+10% | 90%
+20% | 80%
+30% | 70%
+40% | 60%
+50% | 50%
+60% | 40%
+70% | 30%
+80% | 20%
+90% | 10%
+
+As above, for each of the splits, I would repeat the splitting 10 different times,
+training and testing 10 different models. I would also do these for each of the
+features sets:
+
+* Statement Length
+* Parts of Speech
+* Sentiment
+* Readability & Complexity](./hld_FEATURE_complex.html)
+* Bag of Words
+  + top 10 words
+  + top 25 words
+  + top 50 words
+  + top 100 words
+
+(And for the bag of words, I would also train models across different numbers
+of the top words: models only taking into account the top 10 words, the top
+25 words, top 50 words, and top 100 words.)
+
+Below is the actual code to run and store the results of these models.
+(In total, this involved training 960 seperate logistic regression models,
+which took about half an hour to run on my computer.)
+
 
 ```{r, warning=FALSE, cache=TRUE, eval=FALSE}
 # NOTE: warnings are turned off
@@ -439,9 +599,18 @@ total_time <- Sys.time() - start_time
 ```
 
 
-# Results
+## Results
 
-## Results (Collect Summary Statistics)
+Now let's examine how performance various across these different training-testing
+splits and different features sets.
+
+### Results (Collect Summary Statistics)
+
+First, I averaged together the results of the 10 models for each of the subsets of
+the analyses (e.g. in the first first row, we can see that the overall accuracy
+across 10 different models, trained only on the statement length features, with
+a 1% training set, 99% test set split is 50.2%). It will be easier to assess
+these results visually.
 
 ```{r}
 # get average for each round
@@ -461,6 +630,7 @@ results_summ <-
                      avg_precision = mean(precision),
                      min_precision = min(precision),
                      max_precision = max(precision)) %>%
+  ungroup() %>%
   mutate(feature_set = factor(feature_set,
                               levels = c("top 10 words",
                                          "top 25 words",
@@ -475,7 +645,18 @@ results_summ
 
 ```
 
-## Results (Overall Accuracy)
+### Results (Overall Accuracy)
+
+Below, I plot overall accuracy as a function of training-testing split proportion
+(along the x-axis) and features the model was training on (the seperate lines of
+different colors). What we can see from these results is that there are some diminishing
+results of including a larger proportion of our data in the training set (accuracy
+does not continue to increase linearly, but rather tapers off as test set proportion
+increases in size.) Among the features, across all the different training-testing splits,
+the one which seem to provide the best peformance is the top 100 words.
+The worst seems to be tie between the statement length features and the sentiment
+features. (Note that the "error bars" are actually not 95% confidence intervals,
+but bounds of best and worst performance among the 10 different models.)
 
 ```{r, fig.width=9, fig.height=6}
 # set colors
@@ -487,6 +668,9 @@ color_map <- c("top 10 words" = "#91C68D",
                "readability" = "#1D588E",
                "parts of speech" = "#ED721A",
                "sentiment" = "#EDD41A")
+
+# recreated split_probs variale here (created in non-evaluted chunk, but used for graph)
+split_probs <- c(0.01, 0.02, 0.05, seq(from = 0.10, to = 0.90, by = 0.10))
 
 # print plot
 ggplot(data = results_summ,
@@ -518,8 +702,12 @@ ggplot(data = results_summ,
         axis.title.y = element_text(margin = margin(t = 0, r = 8, b = 0, l = 0)))
 ```
 
+### Results (Sensitivity, i.e. Truth Detection)
 
-## Results (Sensitivity, i.e. Truth Detection)
+We see a similar overall story with sensitivity, however models trained on 3
+types of features consistently performed below 50% (readability, sentiment,
+and parts of speech). These features do not appear to be very helpful for detecting
+truths.
 
 ```{r, fig.width=9, fig.height=6}
 # print plot
@@ -552,8 +740,13 @@ ggplot(data = results_summ,
         axis.title.y = element_text(margin = margin(t = 0, r = 8, b = 0, l = 0)))
 ```
 
+### Results (Specificity, i.e. Lie Detection)
 
-## Results (Specificity, i.e. Lie Detection)
+With specificity, across the different features types, the models all go back to
+performing above 50%. (Interestingly, length, parts of speech, and readability seem
+much more useful for identifying lies in this dataset than truth. Although,
+note that these models are trained on raw feature data, where, for example, outlier
+have not been adjusted for with winsorization, which might account for these results.)
 
 ```{r, fig.width=9, fig.height=6}
 # print plot
@@ -588,8 +781,14 @@ ggplot(data = results_summ,
 ```
 
 
-## Results (Precision)
+### Results (Precision)
 
+We see a fairly similar patternw hen looking at precision (percent correct when
+making a prediction that a statement is a truth). Performance increases with more
+training data, but with diminishing returns (and the top 100 words appear to be
+the most useful features). (Negative predictive value results are not shown next,
+as at this point in time in the analysis, I was not focusing on that metric,
+and indeed did not even save it when storing the results of the models.)
 
 ```{r, fig.width=9, fig.height=6}
 # print plot
@@ -623,12 +822,16 @@ ggplot(data = results_summ,
 
 ```
 
+## Save Additional Results
 
-# Save
+Here I am saving the results from the additional analyses conducted above.
 
-```{r}
-save(results,
-     file = "log_results1.Rda")
+```{r, eval = FALSE}
+# DO NOT RUN THIS (correct results already saved month ago; don't risk over-riding with wrong data)
+# this is left here for legacy reasons (to remind name of output file, and sequence of analysis)
+
+# save(results,
+#     file = "log_results1.Rda")
 ```
 
 # Render
@@ -638,6 +841,8 @@ current directory. Rendering with: rmarkdown::render("hld_MODEL_logistic.Rmd")
 
 # Citations
 
+* Binomial proportion confidence interval. (2019). In Wikipedia. Retrieved from https://en.wikipedia.org/w/index.php?title=Binomial_proportion_confidence_interval&oldid=895045323
+
 * Gelman, A., & Hill, J. (2006). Data analysis using regression and 
 multilevel/hierarchical models. Cambridge university press.
 
@@ -645,5 +850,8 @@ multilevel/hierarchical models. Cambridge university press.
 Journal of Statistical Software, 28(5), 1-26.
 
 * Kuhn, M. (2019). The caret Package. Retrieved from https://topepo.github.io/caret/index.html
+
+* Logistic regression. (2019). In Wikipedia. Retrieved from https://en.wikipedia.org/w/index.php?title=Logistic_regression&oldid=896435137
+
 
 # END
