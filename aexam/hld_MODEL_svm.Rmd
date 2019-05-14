@@ -9,8 +9,8 @@ output:
 
 [return to [overview page](./hld_OVERVIEW.html)]
 
-In this section, we will build a support vector machine (SVM) model to make
-truth and lie predictions on our statements. We turn to this technique because 
+In this section, I will build a support vector machine (SVM) model to make
+truth and lie predictions on our statements. I turn to this technique because 
 it is one of the popular modeling methods in "machine learning". Kuhn & Johnson (2013, p.343) 
 state that SVMs have become "one of the most flexible and effective 
 machine learning tools available" since they were first developed by Vladimir Vapnik
@@ -34,40 +34,46 @@ For each of these individual lines, we can imagine perpendicular lines radiating
 from both ends. The distance that each of these lines can radiate outwards before
 they would bump into a data point is called the "margin". In each case, the bounds of 
 this margin are entirely determined by those nearest abutting data points, which are
-called "support vector" (because they sort of "support" the margin). In the simplest
-case, it is my understanding that support vector machines attempt to find the 
+called "support vectors" (because they sort of "support" the margin; and hence the name
+"support vector machines"). In the simplest case, it is my understanding that support 
+vector machines essentially construct a linear model with the largest possible margin
+given the data points.
 
-This strategy can then be generalized to cases of higher dimensions (e.g. defining a plane in
-when we have 3 predictors and are thus working in three dimensions, etc). And further, in
-most cases, of course, the classes are not perfectly seperable and thus in finding our
-maximum margin classifier we can apply penalties as the number of misclassified data points increase.
-This introduces a new parameter that we must set for our model -- the cost, or penalty
-for misclassification. (There is no "correct" cost penalty, and these are usually determined
-through another process of training and testing "nested" within the training data set.
-A cost penality of 1 penalizes "hits" and "misses" equally. Larger cost penalties
+This strategy can then be generalized to cases of higher dimensions (e.g. defining a 2-d 
+plane (instead of a 1-d line) to seperate binary outcomes when we have 3 predictors 
+(instead of 2) and are thus working in three dimensions, etc). And further, of course 
+in most cases, the two classes are not perfectly seperable. However, this problem can be
+dealt with by applying a penalties for each of the misclassified data points when
+generating maximum margin classifiers. This introduces a new parameter that we must 
+set for our model -- the cost penalty for misclassification. (There is no "correct"
+cost penalty. And the actual costs penalties used are usually determined through 
+another process of training and testing that is "nested" within the training data set,
+which cycles through the performance of models with different cost penalties.
+A cost penality of 1 penalizes "hits" and "misses" equally. And larger cost penalties
 tend to result in more overfitting (Kuhn & Johnson, 2013, p.346-347).)
 
 ![](./pics/kuhn_p344_svm.PNG)
 
-Further, we can move from creating linear classification boundaries (e.g. lines,
-planes, and hyperplances, etc) to non-linear classification boundaries through the
-use of a "kernel function", which takes our predictor variables and applies a
-non-linear transformation to them. Popular non-linear kernel functions include
-the polynomial, radial basis, and hyperbolic tangent functions (Kuhn & Johnson, 
-2013, p.347). Some of these kernel functions introduce additional parameters that
-we need to set for our model (e.g. we need to set a free parameter sigma, if using
-the radial basis function). 
+Further, we can move from creating models that produce linear classification boundaries
+(e.g. lines, planes, and hyperplances, etc) to models that produce non-linear 
+classification boundaries through the use of a "kernel function", which takes our 
+predictor variables and applies a non-linear transformation to them. Popular non-linear 
+kernel functions include the polynomial, radial basis, and hyperbolic tangent 
+functions (Kuhn & Johnson, 2013, p.347). Some of these kernel functions introduce
+additional parameters that need to be set (e.g. we need to set a free parameter sigma,
+when using the radial basis function). 
 
 The different classification boundaries created by a non-linear support vector
-machine (which uses a radial basis function) is shown below as a function of
-different possible values of the tunning parameters.
+machine (which, here, uses a radial basis function) is shown below as a function of
+different possible values of the two tunning parameters (the cost penalty and
+sigma).
 
 ![](kuhn_p347_svm_nonlinear)
 
 Let's now implement a support vector machine to predict truths and lies in our
-dataset, using our textual features as predictors. I will use the a support
-vector machine with a radial basis function, as I would like to take advantage of
-SVMs ability to produce non-linear classification boundaries.
+dataset, using our textual features as predictors. I will implement support
+vector machine models with radial basis kernel functions, as I would like to take
+advantage of SVMs ability to produce non-linear classification boundaries.
 
 # Packages
 
@@ -101,20 +107,18 @@ results <- results_svm # change the specific named (renamed at end), back to gen
 ```
 
 
-# EXAMPLE (Single Support Vector Machine Model)
+# EXAMPLE (Support Vector Machine, with Radial Basis Function)
 
-As usual, let's begin with an example. Here we will simply train and test
-one single logistic regression model.
+As usual, let's begin with an example. We will conduct one training-testing
+split and create and assess the performance of of one resultant support 
+vector machine model, with a radial basis kernel function.
 
 ## Split Sample Into Training and Testing Sets
 
-Our first step will be to split the entire dataset into two parts -- our training
-data set, on which the model will be build, and our testing data set, on which
-the performance of our model will be evaluated. Although many possible splits would be
-acceptable (e.g. 75-25, 90-10), we are going to conduct an exact 50-50 split,
-randomly allocating one half of the statements to the training set, and
-the other half to the testing set. The createDataPartition function in the 
-caret packages makes this easy (Kuhn, 2008).
+As with our [logistic regression models](./hld_MODEL_logistic.html), we will
+conduct a 50-50 training-testing split, randomly allocating one half of the 
+statements to the training set, and the other half to the testing set using the
+createDataPartition function in the caret package (Kuhn, 2008).
 
 ```{r partition}
 # set seed, so that statistics don't keep changing for every analysis
@@ -137,32 +141,69 @@ test_set_ex <- stats_proc[-index_train_ex, ]
 
 ## Build Model (on Training Set)
 
-Now that the data are split, we can fit a logistic regression model to the training
-data. Again, the caret package makes this easy with its "train" function (Kuhn, 2008),
-which allows us to select from over 238 different model type (Kuhn, 2019; see:
-[Chapter 7](https://topepo.github.io/caret/train-models-by-tag.html), including
-of course the logistic regression model from the family of general lineal models.
-A single logistic regression model is fitted below.
+Now that the data are split, we can fit an SVM (radial basis) to the training data.
+We can do this by selecting the "svmRadial" model in the  "train" function of
+the caret package (Kuhn, 2008; [Kuhn, 2019](https://topepo.github.io/caret/train-models-by-tag.html)).
 
+Unlike with our logistic regression model, we have two free tuning parameters,
+which need to be selected. These are our cost penalty and our sigma parameter in
+the radial basis function.
 
-```{r svm_ex, cache = TRUE, eval = FALSE}
+The default behavior of the train function for our dataset would be to run through
+three different cost penalties: 0.25, 0.50, and 1.0. And the default behavior
+of the train function for our dataset would be to select a single sigma value
+(rather than trying out several), by taking the mean of the multiple sigma values
+suggested for our dataset by the sigest function in the kernlab package. (Oddly,
+the default code seems to take the mean of these values, excluding the second suggestion
+for no apparent reason [see here for discussion](https://stats.stackexchange.com/questions/408159/what-is-the-basis-for-the-default-sigma-value-used-by-svmradial-in-caret). Thus, I override this and simply take the median of all
+the sigma values suggested by the sigest function). Thus, we will hold the 
+sigma parameter constant, using the (slightly modified) value derived from the
+sigest function. To evaluate a more broad host of cost penalties, I will cycle
+through values from: 0.25, 0.5, 1, 2, and 4.
+
+In the end, we must settle on a single value for each of the two free parameters in
+our model. Our sigma value is already constant, so this is easy. No choices to make
+there. But we must select one cost penalty among our several candidates (0.25, 0.50,
+1, 2, and 4). The process of selecting among different parameters is called "tuning".
+And it is essentially a nested version of testing/training process, that occurs within
+the training dataset we are restricted to here (we will not touch the testing dataset
+we set aside earlier). For each possible parameter value (e.g. cost penalty = 0.25),
+we can train a model on a subset of the training data and evaluate the performance of
+that model on another subset of the training data (essentialy a test set, within
+the trainin set). Indeed, for each parameter value, we can train multiple models
+on subsets of the training data and pick as our final parameters values, those which
+lead to the best performance (here, we will evaluate performance using overall
+accuracy; however other metrics could also be used like [AUC](https://en.wikipedia.org/wiki/Receiver_operating_characteristic#Area_under_the_curve)).
+To create these subsets within our training data we can use the same data splitting
+techniques from before (i.e. cross-validation, repeated training/testing splits).
+For the sake of consistency, I will use the same data-splitting technique for
+model tuning as we used for the overall training-testing split: a 50-50, random
+split, and this will be repeated 3 times for each parameter value (performance at
+each parameter will be the average across these three rounds).
+
+These model tuning process is completed below, followed by a summary of our results.
+As we can see in the textual output, our sigma parameter value was held constant
+(at sigma = 0.005704987), and the cost penalty parameter that resulted in the
+best performance was a cost penalty of 4. Thus, the svm (radial basis) model we
+select will have its free parameters set to: sigma = 0.0057, and cost penalty = 4.
+
+```{r}
+# note: these setting chunks are separated for reuse later
+
 # set seed, so that statistics don't keep changing for every analysis
-# (applies for models which might have random parameters)
 set.seed(2019)
 
-# start timer
-start_time <- Sys.time()
+# -----------------------------------------------------------------------------
+# STEP 1: SELECT TUNING PARAMETERS
 
-# tuning parameters
-tune_params <- 
+# part a: select cost penalty values
+costs_svm <- c(0.25, 0.5, 1, 2, 4)
 
-# set up training 
-train_control_svm <- trainControl(method = "LGOCV",
-                                  number = 3)
-
-# get suggest sigma value
+# part b: get suggested sigma value, for radial basis function, for this data set
 # i take the median of the kernlab suggestions 
-# (default in caret is to take mean, exc)
+# (default in caret is to take mean, excluding second suggestion)
+# see: https://github.com/topepo/caret/blob/master/models/files/svmRadial.R
+# and: https://stats.stackexchange.com/questions/408159/what-is-the-basis-for-the-default-sigma-value-used-by-svmradial-in-caret
 sigma_svm <- median(
               kernlab::sigest(
                 as.matrix(train_set_ex 
@@ -174,37 +215,62 @@ sigma_svm <- median(
                 )
               )
 
+# part c: save parameters in tune grid object
+tune_grid_svm <- expand.grid(sigma = sigma_svm,
+                             C = costs_svm)
 
+# -----------------------------------------------------------------------------
+# STEP 2: SELECT TUNING METHOD
+# set up train control object, which specifies training/testing technique
+train_control_svm <- trainControl(method = "LGOCV",
+                                  number = 3,
+                                  p = 0.50)
 
-# use caret "train" function to train logistic regression model
+```
+
+```{r svm_ex, cache = TRUE, eval = FALSE}
+# set seed, so that statistics don't keep changing for every analysis
+# (applies for models which might have random parameters)
+set.seed(2019)
+
+# start timer
+start_time <- Sys.time()
+
+# -----------------------------------------------------------------------------
+# STEP 3: TRAIN MODEL
+
+# use caret "train" function to train svm
 model_ex <- 
   train(form = grd_truth ~ . - stat_id,
         data = train_set_ex,
-        method = "svmRadial"),
-        tuneGrid = expand.grid(# sigma = sigma_svm,
-                               C = c(1)),
-        trControl = trainControl(method = "LGOCV",
-                                  number = 3))
+        method = "svmRadial",
+        tuneGrid = tune_grid_svm,
+        trControl = train_control_svm,
+        metric = "Accuracy") # how to select among models
 
 # end timer
 total_time <- Sys.time() - start_time
 
 ```
 
-
 ```{r}
-attributes(model_ex)
+# print out overall summary for tuning process
+model_ex
 
 ```
-
-```{r}
-model_ex$finalModel
-```
-
 
 ## Evaluate Model (on Testing Set)
 
-Finally, let's see if our model is any good. To do this, we will use it to make
+Finally, let's officially evaluate the performance of this SVM model on our
+holdout testing set. (Note that while we used a training-testing process within
+our training set to select our model parameters, this is not the official metric 
+of our model's performance.)
+
+When we evaluate the performance of our tuned model on the holdout testing set 
+(consisting of the 2,5004 statements we set aside at the very beginning), we
+see that it performs well. 
+
+To do this, we will use it to make
 predictions about the remaining 2,504 statments in the test set, which we set aside earlier.
 This is done below. The confusionMatrix function from the caret package provides an
 easy way to collect some basic statistics on how our model performed. As we can see
@@ -226,6 +292,9 @@ do so below in our full analysis.)
 
 
 ```{r svm_ex_conf, cache = FALSE}
+# note: https://stats.stackexchange.com/questions/52274/how-to-choose-a-predictive-model-after-k-fold-cross-validation
+# which makes clear that we retrain our final model selected after turning on ALL the training data
+
 # make predictions
 preds_ex <-
   predict(object = model_ex,
@@ -256,11 +325,11 @@ Below is the code that runs through this modeling process 10 different times and
 saves the result from each round.
 
 ```{r svm_full, cache = TRUE, eval = FALSE}
-# # -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # STEP 0: set seed, so that statistics don't keep changing for every analysis
 set.seed(2019)
 
-# # -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # STEP 1: decide how many times to run the model
 rounds <- 10
 
