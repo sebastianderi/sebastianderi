@@ -68,7 +68,7 @@ machine (which, here, uses a radial basis function) is shown below as a function
 different possible values of the two tunning parameters (the cost penalty and
 sigma).
 
-![](kuhn_p347_svm_nonlinear)
+![](./pics/kuhn_p347_svm_nonlinear.PNG)
 
 Let's now implement a support vector machine to predict truths and lies in our
 dataset, using our textual features as predictors. I will implement support
@@ -146,7 +146,7 @@ We can do this by selecting the "svmRadial" model in the  "train" function of
 the caret package (Kuhn, 2008; [Kuhn, 2019](https://topepo.github.io/caret/train-models-by-tag.html)).
 
 Unlike with our logistic regression model, we have two free tuning parameters,
-which need to be selected. These are our cost penalty and our sigma parameter in
+which need to be set. These are our cost penalty and our sigma parameter in
 the radial basis function.
 
 The default behavior of the train function for our dataset would be to run through
@@ -162,30 +162,33 @@ sigest function. To evaluate a more broad host of cost penalties, I will cycle
 through values from: 0.25, 0.5, 1, 2, and 4.
 
 In the end, we must settle on a single value for each of the two free parameters in
-our model. Our sigma value is already constant, so this is easy. No choices to make
+our model. Our sigma value is already constant, so this is done. No choices to make
 there. But we must select one cost penalty among our several candidates (0.25, 0.50,
-1, 2, and 4). The process of selecting among different parameters is called "tuning".
-And it is essentially a nested version of testing/training process, that occurs within
-the training dataset we are restricted to here (we will not touch the testing dataset
-we set aside earlier). For each possible parameter value (e.g. cost penalty = 0.25),
-we can train a model on a subset of the training data and evaluate the performance of
+1, 2, and 4). The process of selecting among different parameters is called model 
+"tuning". To select among the candidate cost penalty parameter values, we will
+conducted a nested version of testing/training process within the training dataset 
+we are restricted to here (we will not touch the 2500 entry testing dataset
+we set aside earlier). For each possible parameter value (e.g. cost penalty = 0.25,
+cost penality = 0.50, etc), we can train a model with that parameter value
+on a subset of the training data and evaluate the performance of
 that model on another subset of the training data (essentialy a test set, within
-the trainin set). Indeed, for each parameter value, we can train multiple models
-on subsets of the training data and pick as our final parameters values, those which
-lead to the best performance (here, we will evaluate performance using overall
-accuracy; however other metrics could also be used like [AUC](https://en.wikipedia.org/wiki/Receiver_operating_characteristic#Area_under_the_curve)).
-To create these subsets within our training data we can use the same data splitting
-techniques from before (i.e. cross-validation, repeated training/testing splits).
-For the sake of consistency, I will use the same data-splitting technique for
-model tuning as we used for the overall training-testing split: a 50-50, random
-split, and this will be repeated 3 times for each parameter value (performance at
-each parameter will be the average across these three rounds).
+the trainin set). To create these subsets within our training data we can use 
+the same data splitting techniques from before (i.e. cross-validation, repeated 
+training/testing splits). For the sake of consistency, I will use the same 
+data-splitting technique for model tuning as we used for the overall training-testing
+split: a 50-50, random split (i.e. the ~2500 entry training set will be further
+subdivide into a ~1250 entry sub-training-set training set and a ~1250 sub-training-set
+testing set). For each parameter value, we will actually repeat this process 3 times,
+and the performance of the model with that parameter value will be the average 
+across these three rounds (the metric by which performance will be evaluated here
+will be overall accuracy; however other metrics could also be used like [AUC](https://en.wikipedia.org/wiki/Receiver_operating_characteristic#Area_under_the_curve)).
 
 These model tuning process is completed below, followed by a summary of our results.
 As we can see in the textual output, our sigma parameter value was held constant
-(at sigma = 0.005704987), and the cost penalty parameter that resulted in the
-best performance was a cost penalty of 4. Thus, the svm (radial basis) model we
-select will have its free parameters set to: sigma = 0.0057, and cost penalty = 4.
+(at sigma = 0.0057), and the cost penalty parameter that resulted in the
+best performance was a cost penalty of 2 (which led to an average accuracy rate of
+61.3%). Thus, the svm (radial basis) model we select will have its tuning parameters 
+set to: sigma = 0.0057, and cost penalty = 2.
 
 ```{r}
 # note: these setting chunks are separated for reuse later
@@ -228,7 +231,7 @@ train_control_svm <- trainControl(method = "LGOCV",
 
 ```
 
-```{r svm_ex, cache = TRUE, eval = FALSE}
+```{r svm_ex, cache = TRUE}
 # set seed, so that statistics don't keep changing for every analysis
 # (applies for models which might have random parameters)
 set.seed(2019)
@@ -253,7 +256,7 @@ total_time <- Sys.time() - start_time
 
 ```
 
-```{r}
+```{r model_ex_print}
 # print out overall summary for tuning process
 model_ex
 
@@ -261,35 +264,32 @@ model_ex
 
 ## Evaluate Model (on Testing Set)
 
-Finally, let's officially evaluate the performance of this SVM model on our
-holdout testing set. (Note that while we used a training-testing process within
-our training set to select our model parameters, this is not the official metric 
-of our model's performance.)
+Now that we have selected values for our two tuning parameters (sigma = 0.0057,
+and cost penalty = 2), let's build our full model and evaluate its peformance.
+(Note that while we build and evaluated models earlier, these were only built on
+subsets (i.e of ~1250 entries) of the training dataset and evaluated on
+diferent subsets of that same training dataset (also of ~1250 entries). Now that
+we have selected our tuning parameters, we want to build a model with those parameters
+on the full training dataset (i.e. ~2500 entries) and evaluate its performance on
+the original training set we put aside at the beginning (also of ~2500 entries)).
 
-When we evaluate the performance of our tuned model on the holdout testing set 
-(consisting of the 2,5004 statements we set aside at the very beginning), we
-see that it performs well. 
+When we evaluate the performance of our tuned model on the holdout testing set, we
+see that it performs well. Its overall accuracy was significantly better than 
+chance: 63.2% [95% CI: 61.3, 65.1%]. And it performed well both in identifying 
+truths (i.e. sensitivity: 61.9%) and identifying lies
+(i.e. specificity: 64.6%). (I wondered if the rate of lie detection (specificity)
+was significantly higher than the rate of truth detection (sensitivity); however,
+a two sample test for equality of proportions revealed this was not the case,
+X^2 = 1.76, p = 0.184.)
 
-To do this, we will use it to make
-predictions about the remaining 2,504 statments in the test set, which we set aside earlier.
-This is done below. The confusionMatrix function from the caret package provides an
-easy way to collect some basic statistics on how our model performed. As we can see
-from the text output of this function, our model did pretty well (Kuhn, 2008). 
-Its overall accuracy was 
-significantly better than chance: 60.7% [95% CI: 58.8, 62.6%]. And it performed
-well both in identifying truths (i.e. sensitivity: 58.2%) and identifying lies
-(i.e. specificity: 63.3%). When it made a prediction that a statement was a truth,
-it was correct more often than not (i.e. precision or positive predictive value:
-61.3%). And when it made a prediction that a statement was a lie, it was also
-correct more often than not (i.e. negative predictive value: 60.2%). (Confidence
+Finally, we can evaluate the quality of the model's guessing. When the model made 
+a prediction that a statement was a truth, it was correct more often than not 
+(i.e. precision or positive predictive value:
+63.6%). And when it made a prediction that a statement was a lie, it was also
+correct more often than not (i.e. negative predictive value: 62.9%). (Confidence
 intervals can easily be generated for these other four statistics as well (i.e. +/-
-z\*(sqrt(p\*(1-p)/n), where z = 1.96 under the normal approximation method
-for calculating binomial proportion confidence intervals (Binomial proportion 
-confidence interval, 2019); I won't calculate these for this example, but I will 
-do so below in our full analysis.)
-
-(Note: some of the point statistics referenced throughout ths analys)
-
+z\*(sqrt(p\*(1-p)/n), where z = 1.96; I won't calculate these for this example,
+but I will do so below in our full analysis.)
 
 ```{r svm_ex_conf, cache = FALSE}
 # note: https://stats.stackexchange.com/questions/52274/how-to-choose-a-predictive-model-after-k-fold-cross-validation
@@ -312,12 +312,18 @@ conf_ex
 
 ```
 
+```{r prop_test}
+# test whether sensitivity is better than specificity
+prop.test(x = c(807, 774),
+          n = c((807+443), (774+476)),
+          alternative = "two.sided")
+```
+
+
 # FULL (Predictive Logistic Regression Models)
 
-Our full analysis will almost exactly replicate what we did in our example case
-above, except we will replicate the procedure ten times. Thus, we will build
-10 different logistic regression models using 10 different training sets and evaluate 
-them on their 10 different (corresponding) test sets.
+Let's now repeated the process from above 10 times, and evaluate the average
+performance of our SVM (radial basis) model across these 10 iterations.
 
 ## Run 10 models
 
@@ -375,7 +381,10 @@ for (i in 1:rounds){
   model <- 
     train(form = grd_truth ~ . - stat_id,
           data = train_set,
-          method = "svmRadial")
+          method = "svmRadial",
+          tuneGrid = tune_grid_svm,
+          trControl = train_control_svm,
+          metric = "Accuracy") # how to select among models)
   
   # part d: make predictions
   preds <-
@@ -424,34 +433,24 @@ for (i in 1:rounds){
 ## View Results (Tabular)
 
 Below, I've displayed a raw tabular summary of the results from each of the 10 models.
-As we can see, the results vary somewhat from model to model (e.g. our first model
-had an overall accuracy of 60.7%, while our second model had an overall accuracy of
-60.2%), although are highly consistent (the variation in our overall performance of
-our best peforming model (round 6: 61.5%) and our worst performing model (round 9:
-59.4%) is less than 3%).
+As before, there is some variability from model to model (e.g. our first model
+had an overall accuracy of 62.8%, while our second model had an overall accuracy of
+61.2%), but for overall story is one of consistency.
 
-```{r}
+```{r full_results}
 results
   
 ```
 
 ## View Results (Graphically)
 
-Let's visualize average performance across our 10 different models, on some of the
-key performance metrics. This is done below. As we can see, over 10 models,
-overall accuracy is above chance (with mean performance hovering just below 60%,
-and even the lower limit of the confidence interval on this estimate well above 55%).
-Similarly, the models performed above chance when predicting make predictions
-about statements that were truths and when making predictions about statements
-that were lies (confidence intervals for both sensitivity and specificity well
-above 50%). And the models were also more reliable than chance when making
-a prediction that a statment was a truth and when making a prediction that a
-statement was a lie (confidence intervals for precision and npv above 50%).
-These results are promising. They reveal that even basic textual features
-allow for deciphering of lies from truth.
+The average SVM model performance across our the 10 iterations is plotted below,
+where our five primary performance statistics are highlighted (accuracy, sensitivity,
+specificity, precision and negative predictive value). All are significantly above
+50% (and we see that for overall accuracy, the lower bound of the 95% confidence
+interval is even above 60%).
 
-
-```{r}
+```{r viz_full_results}
 # calculate average sample size
 mean_n <- mean(results$n)
 
@@ -510,23 +509,21 @@ labs(title = "Performance Statistics (Support Vector Machine)",
 
 # Save Results
 
-```{r, eval = FALSE}
+```{r save, eval = FALSE}
 # rename results df, to be particular to this model type (for disambiguation later)
 results_svm <- results
 
 # clear results variable
- rm(results)
+rm(results)
 
 # save results in Rda file
-save(model_ex,
-     results_svm,
+save(results_svm,
      file = "results_svm.Rda")
 ```
 
 # Render
 
-Again, some chunks which take long to evaluate are not evaluating and instead saved/loaded from
-current directory. Rendering with: rmarkdown::render("hld_MODEL_svm.Rmd")
+If needed, I can render with rmarkdown::render("hld_MODEL_svm.Rmd").
 
 # Citations
 
