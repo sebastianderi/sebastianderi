@@ -445,6 +445,7 @@ results
   
 ```
 
+
 ## View Results (Graphically)
 
 The average neural network performance across our the 10 iterations is plotted below,

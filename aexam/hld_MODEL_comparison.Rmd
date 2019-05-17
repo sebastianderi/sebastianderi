@@ -18,12 +18,6 @@ Again, I will start by loading relevant packages.
 ```{r, message=FALSE, warning=FALSE}
 # before knitting: message = FALSE, warning = FALSE
 library(tidyverse) # cleaning and visualization
-library(ggthemes) # visualization
-library(caret) # modeling
-library(broom) # needed for ggcoef function
-library(GGally) # has ggcoef function
-library(AppliedPredictiveModeling)
-library(pROC) # ROC curve
 
 ```
 
@@ -34,23 +28,40 @@ in the earlier sections.
 
 ```{r}
 # load results df's from each of the models we created
+load("results_log.Rda")
+load("results_svm.Rda")
+load("results_neural.Rda")
 
 ```
+
+```{r}
+# combine all results together
+results <-
+  rbind(results_log,
+        results_svm,
+        results_neural)
+```
+
+```{r}
+# calculate average sample sizes (for later CI's)
+n_log <- mean(results[results$model_type == "logistic", ]$n)
+n_svm <- mean(results[results$model_type == "svm", ]$n)
+n_neural <- mean(results[results$model_type == "neural", ]$n)
+```
+
 
 # Comparison (Overall Accuracy)
 
 ```{r}
 results %>%
   group_by(model_type) %>%
-  summarize(accuracy = mean(accuracy),
-         accuracy_LL = mean(accuracy_LL),
-         accuracy_UL = mean(accuracy_UL)) %>%
+  summarize(accuracy = mean(accuracy)) %>%
   ggplot(aes(x = model_type,
              y = accuracy)) +
   geom_point(size = 2,
              color = "#545EDF") +
-  geom_errorbar(aes(ymin = accuracy_LL,
-                     ymax = accuracy_UL),
+  geom_errorbar(aes(ymin = accuracy - 1.96*sqrt(accuracy*(1-accuracy)/n_log),
+                     ymax = accuracy + 1.96*sqrt(accuracy*(1-accuracy)/n_log)),
                 color = "#545EDF",
                 width = 0.05,
                 size = 1) +
@@ -58,8 +69,9 @@ results %>%
              linetype = "dashed",
              size = 0.5,
              color = "red") +
-  scale_y_continuous(breaks = seq(from = 0, to = 1, by = 0.05),
-                     limits = c(0, 1)) +
+  scale_y_continuous(breaks = seq(from = 0.49, to = 0.70, by = 0.01),
+                     limits = c(0.49, 0.70)) +
+  scale_x_discrete(limits = c("logistic", "svm", "neural")) +
   theme(panel.grid.major.x = element_blank(),
         panel.grid.minor.x = element_blank(),
         panel.grid.major.y = element_line(color = "grey",
@@ -77,3 +89,57 @@ results %>%
 
 ```
 
+# Comparison (Sensitivity, Specificity, Precision, Negative Predictive Value)
+
+
+```{r, fig.width=8, fig.height=8}
+results %>%
+  select(model_type, round, sensitivity, specificity, precision, npv) %>%
+  gather(key = "metric",
+         value = "value",
+         sensitivity, specificity, precision, npv) %>%
+  group_by(model_type, metric) %>%
+  summarize(value = mean(value)) %>%
+  ungroup() %>%
+  mutate(metric = factor(metric,
+                            levels = c("sensitivity", "specificity", "precision", "npv"))) %>%
+  ggplot(aes(x = model_type,
+             y = value)) +
+  geom_point(size = 2,
+             color = "#545EDF") +
+  geom_errorbar(aes(ymin = value - 1.96*sqrt(value*(1-value)/n_log),
+                     ymax = value + 1.96*sqrt(value*(1-value)/n_log)),
+                color = "#545EDF",
+                width = 0.05,
+                size = 1) +
+  geom_hline(yintercept = 0.5,
+             linetype = "dashed",
+             size = 0.5,
+             color = "red") +
+  scale_y_continuous(breaks = seq(from = 0.50, to = 0.70, by = 0.05),
+                     limits = c(0.49, 0.70)) +
+  scale_x_discrete(limits = c("logistic", "svm", "neural")) +
+  facet_grid(metric ~ .) +
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.y = element_line(color = "grey",
+                                          size = 0.25),
+        plot.background = element_blank(),
+        panel.background = element_blank(),
+        panel.border = element_rect(colour = "black", fill=NA, size=1),
+        axis.ticks = element_blank(),
+        plot.title = element_text(hjust = 0.5),
+        axis.title.y = element_text(margin = 
+                                      margin(t = 0, r = 10, b = 0, l = 0)),
+        axis.title.x = element_text(margin = 
+                                      margin(t = 10, r = 00, b = 0, l = 0))) +
+  labs(title = "Metrics by Model Type",
+       x = "Model Type",
+       y = "Proportion")
+
+```
+
+
+
+
+# END

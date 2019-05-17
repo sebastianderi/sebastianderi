@@ -70,15 +70,16 @@ build on each other sequentially.
     + Modeling
         + [Modeling Overview](./hld_MODEL_overview.html)
         + [Logistic Regression](./hld_MODEL_logistic.html)
-        + [Support Vector Machines](./hld_MODEL_svm.html)
-        + [Neural Network](/.hld_MODEL_neural.html)
+        + [Support Vector Machine](./hld_MODEL_svm.html)
+        + [Neural Network](./hld_MODEL_neural.html)
         + [Comparison of All Models](./hld_MODEL_comparison.html)
 * [Human Performance](./hld_HUMAN_perf.html)
-* Hybrid Performance
-    + [Logistic Regression Hybrid Model](./hld_MODEL_logistic.html)
-    + [Support Vector Machine Hybrid Model](./hld_MODEL_svm.html)
-    + [Neural Network Hyrbid](/.hld_MODEL_neural.html)
-    + [Comparison of All Hybrid Models](./hld_MODEL_comparison.html)
+* [Comparison of Human and Computer Performance](./hld_HUMAN_MODEL_comparison.html)
+* [Hybrid Performance](./hld_HMODEL_overview.html)
+    + [Logistic Regression Hybrid Model](./hld_HMODEL_logistic.html)
+    + [Support Vector Machine Hybrid Model](./hld_HMODEL_svm.html)
+    + [Neural Network Hyrbid](/.hld_HMODEL_neural.html)
+    + [Comparison of All Hybrid Models](./hld_HMODEL_comparison.html)
 
 # Format
 

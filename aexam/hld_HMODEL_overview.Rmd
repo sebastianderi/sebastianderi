@@ -1,0 +1,58 @@
+---
+title: "Hybrid Performance"
+author: Sebastian Deri
+output:
+  html_document:
+    df_print: paged
+    code_folding: show
+---
+
+[return to [overview page](./hld_OVERVIEW.html)]
+
+# Packages
+
+Again, I will start by loading relevant packages.
+
+```{r, message=FALSE, warning=FALSE}
+# before knitting: message = FALSE, warning = FALSE
+library(tidyverse) # cleaning and visualization
+
+```
+
+# Load Data
+
+First, I will load the various cleaned versions of the data we just
+created.
+
+```{r}
+# load in cleaned features
+load("stats_proc.Rda")
+rm(stats_raw) # remove raw (un-processed) feature data
+
+# load in guesses
+load("stats_guess.Rda")
+
+```
+
+```{r}
+# combine data
+stats_combo <-
+  stats_guess %>%
+  select(stat_id, predict) %>%
+  left_join(y = stats_proc,
+            by = "stat_id")
+
+# print resultant df
+stats_combo
+
+```
+
+# Save Results
+
+```{r save, eval = FALSE}
+# save combined file in Rda file
+save(stats_combo,
+     file = "stats_combo.Rda")
+```
+
+# END

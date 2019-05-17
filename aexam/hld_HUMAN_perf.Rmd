@@ -34,11 +34,16 @@ created.
 ```{r}
 # load in guesses from RAs
 stats_emem <- 
-  read.xlsx("guesses_clean_emem_official.xlsx",
+  read.xlsx("guesses_EMEM.xlsx",
+            sheetIndex = 1)
+
+
+stats_catherine <- 
+  read.xlsx("guesses_CATHERINE.xlsx",
             sheetIndex = 1)
 
 stats_lexi <-
-  read.xlsx("guesses_clean_lexi.xls",
+  read.xlsx("guesses_LEXI.xls",
             sheetIndex = 1)
 
 # load data frame that has stat_id connected to grd_truth
@@ -46,6 +51,7 @@ load("stats_clean.Rda")
 
 
 ```
+
 
 # Clean Data
 
@@ -61,6 +67,17 @@ stats_emem_clean <-
   mutate(person = "emem") %>%
   dplyr::mutate(order = row_number())
 
+# rename columns in catherine file
+stats_catherine_clean <-
+  stats_catherine %>%
+  select(stat_id, 5, 6) %>%
+  rename_at(2, ~ "predict") %>%
+  rename_at(3, ~ "conf") %>%
+  mutate(predict = tolower(trimws(predict))) %>%
+  filter(!is.na(predict)) %>%
+  mutate(person = "catherine") %>%
+  dplyr::mutate(order = row_number())
+
 # rename columns in lexi file
 stats_lexi_clean <-
   stats_lexi %>%
@@ -73,12 +90,25 @@ stats_lexi_clean <-
   mutate(person = trimws(as.character(person))) %>%
   mutate(person = case_when(person == "1" ~ "lexi",
                             person != "1" ~ person)) %>%
+  filter(person == "lexi") %>% # only take the guesses from lexi (not the p's ran)
   dplyr::mutate(order = row_number())
 
 # combine files
 stats_guess <-
   bind_rows(stats_emem_clean,
+            stats_catherine_clean,
             stats_lexi_clean)
+
+# find statements for which multiple people might have registered guesses
+overlap_stat_id <-
+  c(intersect(stats_emem_clean$stat_id, stats_catherine_clean$stat_id), # has overlap
+    intersect(stats_emem_clean$stat_id, stats_lexi_clean$stat_id),
+    intersect(stats_catherine_clean$stat_id, stats_lexi_clean$stat_id))
+
+# remove any rows which have been answered by multiple people
+stats_guess <-
+  stats_guess %>%
+  filter(!(stat_id %in% overlap_stat_id))
 
 # join files with ground truth data
 stats_guess <- 
@@ -107,11 +137,132 @@ stats_guess %>%
 # Overall Performance
 
 ```{r}
-confusionMatrix(data = stats_guess$predict,
-                reference = stats_guess$grd_truth,
-                positive = "truth")
+# save confusion matrix with performance stats
+human_conf <-
+  confusionMatrix(data = stats_guess$predict,
+                  reference = stats_guess$grd_truth,
+                  positive = "truth")
+
+# print confusion matrix
+human_conf
 
 ```
+
+# Overall Performance (Visualization)
+
+```{r}
+# -----------------------------------------------------------------------------
+# STEP 1: make df to store results (organize with same columns as computer model results df's)
+# part a: create names of results to store
+result_cols <- c("model_type", "round", "accuracy", "accuracy_LL", "accuracy_UL",
+                 "sensitivity", "specificity", "precision", "npv", "n")
+
+# part b: create matrix
+results <-
+  matrix(nrow = 1,
+         ncol = length(result_cols))
+
+# part c: actually name columns in results marix
+colnames(results) <- result_cols
+
+# part d: convert to df (so multiple variables of different types can be stored)
+results <- data.frame(results)
+
+# -----------------------------------------------------------------------------
+# STEP 2: actually store results
+# model type
+results[1, 1] <- "human"
+# round
+results[1, 2] <- 1
+# accuracy
+results[1, 3] <- human_conf$overall[1]
+# accuracy LL
+results[1, 4] <- human_conf$overall[3]
+# accuracy UL
+results[1, 5] <- human_conf$overall[4]
+# sensitivity
+results[1, 6] <- human_conf$byClass[1]
+# specificity
+results[1, 7] <- human_conf$byClass[2]
+# precision
+results[1, 8] <- human_conf$byClass[3]
+# negative predictive value
+results[1, 9] <- human_conf$byClass[4]
+# sample size (of test set)
+results[1, 10] <- sum(human_conf$table)
+
+```
+
+```{r}
+# -----------------------------------------------------------------------------
+# STEP 3: actual visualization
+# step a: create df to use for visualization
+results_viz <-
+  results %>%
+  select(-model_type, -round, -n, -accuracy_LL, -accuracy_UL) %>%
+  gather(key = "perf_stat",
+         value = "value") %>%
+  mutate(value = as.numeric(value))
+
+# step b: visualize results
+ggplot(data = results_viz,
+  aes(x = perf_stat,
+           y = value)) +
+geom_point(size = 2,
+           color = "#545EDF") +
+geom_errorbar(aes(ymin = (value - 1.96*sqrt(value*(1-value)/results$n)),
+                   ymax = (value + 1.96*sqrt(value*(1-value)/results$n))),
+              color = "#545EDF",
+              width = 0.15,
+              size = 1.25) +
+geom_hline(yintercept = 0.5,
+           linetype = "dashed",
+           size = 0.5,
+           color = "red") +
+scale_y_continuous(breaks = seq(from = 0, to = 1, by = 0.05),
+                   limits = c(0, 1)) +
+scale_x_discrete(limits = rev(c("accuracy", "sensitivity", "specificity", 
+                            "precision", "npv"))) + 
+coord_flip() +
+theme(panel.grid.major.x = element_line(color = "grey",
+                                        size = 0.25),
+      panel.grid.minor.x = element_blank(),
+      panel.grid.major.y = element_blank(),
+      panel.background = element_blank(),
+      axis.ticks = element_blank(),
+      plot.title = element_text(hjust = 0.5),
+      axis.title.y = element_text(margin = 
+                                    margin(t = 0, r = 10, b = 0, l = 0)),
+      axis.title.x = element_text(margin = 
+                                    margin(t = 10, r = 00, b = 0, l = 0)),
+      axis.text.x = element_text(angle = 90)) +
+labs(title = "Performance Statistics (Human Guessing)",
+     x = "Performance Statistic",
+     y = "Proportion (0 to 1)")
+
+
+```
+
+
+# Save
+
+```{r, eval=FALSE}
+# saved bound together human guesses
+save(stats_guess,
+     file = "stats_guess.Rda")
+
+# rename results df, to be particular to this model type (for disambiguation later)
+results_human <- results
+
+# clear results variable
+rm(results)
+
+# save results in Rda file
+save(results_human,
+     file = "results_human.Rda")
+```
+
+# OTHER ANALYSES
 
 ## Performance by Person
 
@@ -298,13 +449,4 @@ human_perf_conf %>%
 ```
 
 
-# Save
-
-```{r}
-save(stats_guess,
-     file = "stats_guess.Rda")
-```
-
-
 # END
-

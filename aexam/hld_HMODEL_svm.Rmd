@@ -1,0 +1,499 @@
+---
+title: "Hybrid Modeling (Support Vector Machine)"
+author: Sebastian Deri
+output:
+  html_document:
+    df_print: paged
+    code_folding: show
+---
+
+[return to [overview page](./hld_OVERVIEW.html)]
+
+In this section, I will build a support vector machine (SVM) model to make
+truth and lie predictions on our statements. I turn to this technique because 
+it is one of the popular modeling methods in "machine learning". Kuhn & Johnson (2013, p.343) 
+state that SVMs have become "one of the most flexible and effective 
+machine learning tools available" since they were first developed by Vladimir Vapnik
+in the 1960s. Indeed, SVMs are used in countless research papers in the realm of
+computational social science and text analysis (e.g. Bakshy, Messing, & Adamic 
+(2015) use an SVM for news article classification in their highly cited paper 
+on selective news exposure on Facebook, and Wu et al. (2008) list it in their 
+article "Top 10 algorithms in data mining", a paper which itself has over 3,900 citations).
+
+
+# Packages
+
+Let's make sure to load all the relevant packages.
+
+```{r packages, message=FALSE, warning=FALSE}
+# before knitting: message = FALSE, warning = FALSE
+library(tidyverse) # cleaning and visualization
+library(caret) # modeling
+library(kernlab) # has sigest
+
+```
+
+# Load Data
+
+Next, I will again load the pre-processed data, which we created earlier
+(see [Data Cleaning & Pre-Processing](./hld_CLEAN.html)). As a reminder,
+this dataset has a row for each of 5,004 statements, a column indicating whether 
+that particular statement was a truth or a lie, and 90 possible predictor variables for 
+each statement, which comes from the textual features we extracted earlier.
+
+```{r load}
+# load df of combined human and processed textual feature and ground truth
+load("stats_combo.Rda")
+
+```
+
+```{r}
+# change predictions to 0-1 valued variable
+stats_combo1 <-
+  stats_combo %>%
+  mutate(predict = case_when(predict == "truth" ~ 1,
+                             predict == "lie" ~ 0))
+
+# print resultant df
+stats_combo1
+
+# try without predictions at all
+stats_combo2 <- stats_combo %>% select(-predict)
+
+```
+
+
+# EXAMPLE (Support Vector Machine, with Radial Basis Function)
+
+As usual, let's begin with an example. We will conduct one training-testing
+split and create and assess the performance of of one resultant support 
+vector machine model, with a radial basis kernel function.
+
+## Split Sample Into Training and Testing Sets
+
+As with our [logistic regression models](./hld_MODEL_logistic.html), we will
+conduct a 50-50 training-testing split, randomly allocating one half of the 
+statements to the training set, and the other half to the testing set using the
+createDataPartition function in the caret package (Kuhn, 2008).
+
+```{r partition}
+# set seed, so that statistics don't keep changing for every analysis
+set.seed(2019)
+
+# partition data in 50-50 lgocv split (create index for test set)
+index_train_ex <- 
+  createDataPartition(y = stats_combo2$stat_id,
+                      p = 0.50,
+                      times = 1,
+                      list = FALSE)
+
+# actually create data frame with training set (predictors and outcome together)
+train_set_ex <- stats_combo2[index_train_ex, ]
+
+# actualy create data frame with test set (predictors and outcome together)
+test_set_ex <- stats_combo2[-index_train_ex, ]
+
+```
+
+## Build Model (on Training Set)
+
+Now that the data are split, we can fit an SVM (radial basis) to the training data.
+We can do this by selecting the "svmRadial" model in the  "train" function of
+the caret package (Kuhn, 2008; [Kuhn, 2019](https://topepo.github.io/caret/train-models-by-tag.html)).
+
+Unlike with our logistic regression model, we have two free tuning parameters,
+which need to be set. These are our cost penalty and our sigma parameter in
+the radial basis function.
+
+The default behavior of the train function for our dataset would be to run through
+three different cost penalties: 0.25, 0.50, and 1.0. And the default behavior
+of the train function for our dataset would be to select a single sigma value
+(rather than trying out several), by taking the mean of the multiple sigma values
+suggested for our dataset by the sigest function in the kernlab package. (Oddly,
+the default code seems to take the mean of these values, excluding the second suggestion
+for no apparent reason [see here for discussion](https://stats.stackexchange.com/questions/408159/what-is-the-basis-for-the-default-sigma-value-used-by-svmradial-in-caret). Thus, I override this and simply take the median of all
+the sigma values suggested by the sigest function). Thus, we will hold the 
+sigma parameter constant, using the (slightly modified) value derived from the
+sigest function. To evaluate a more broad host of cost penalties, I will cycle
+through values from: 0.25, 0.5, 1, 2, and 4.
+
+In the end, we must settle on a single value for each of the two free parameters in
+our model. Our sigma value is already constant, so this is done. No choices to make
+there. But we must select one cost penalty among our several candidates (0.25, 0.50,
+1, 2, and 4). The process of selecting among different parameters is called model 
+"tuning". To select among the candidate cost penalty parameter values, we will
+conducted a nested version of testing/training process within the training dataset 
+we are restricted to here (we will not touch the 2500 entry testing dataset
+we set aside earlier). For each possible parameter value (e.g. cost penalty = 0.25,
+cost penality = 0.50, etc), we can train a model with that parameter value
+on a subset of the training data and evaluate the performance of
+that model on another subset of the training data (essentialy a test set, within
+the trainin set). To create these subsets within our training data we can use 
+the same data splitting techniques from before (i.e. cross-validation, repeated 
+training/testing splits). For the sake of consistency, I will use the same 
+data-splitting technique for model tuning as we used for the overall training-testing
+split: a 50-50, random split (i.e. the ~2500 entry training set will be further
+subdivide into a ~1250 entry sub-training-set training set and a ~1250 sub-training-set
+testing set). For each parameter value, we will actually repeat this process 3 times,
+and the performance of the model with that parameter value will be the average 
+across these three rounds (the metric by which performance will be evaluated here
+will be overall accuracy; however other metrics could also be used like [AUC](https://en.wikipedia.org/wiki/Receiver_operating_characteristic#Area_under_the_curve)).
+
+These model tuning process is completed below, followed by a summary of our results.
+As we can see in the textual output, our sigma parameter value was held constant
+(at sigma = 0.0057), and the cost penalty parameter that resulted in the
+best performance was a cost penalty of 2 (which led to an average accuracy rate of
+61.3%). Thus, the svm (radial basis) model we select will have its tuning parameters 
+set to: sigma = 0.0057, and cost penalty = 2.
+
+```{r}
+# note: these setting chunks are separated for reuse later
+
+# set seed, so that statistics don't keep changing for every analysis
+set.seed(2019)
+
+# -----------------------------------------------------------------------------
+# STEP 1: SELECT TUNING PARAMETERS
+
+# part a: select cost penalty values
+costs_svm <- c(0.25, 0.5, 1, 2, 4)
+
+# part b: get suggested sigma value, for radial basis function, for this data set
+# i take the median of the kernlab suggestions 
+# (default in caret is to take mean, excluding second suggestion)
+# see: https://github.com/topepo/caret/blob/master/models/files/svmRadial.R
+# and: https://stats.stackexchange.com/questions/408159/what-is-the-basis-for-the-default-sigma-value-used-by-svmradial-in-caret
+sigma_svm <- median(
+              kernlab::sigest(
+                as.matrix(train_set_ex 
+                            %>% select(
+                              -stat_id,
+                              -grd_truth)
+                          ),
+                scaled = TRUE
+                )
+              )
+
+# part c: save parameters in tune grid object
+tune_grid_svm <- expand.grid(sigma = sigma_svm,
+                             C = costs_svm)
+
+# -----------------------------------------------------------------------------
+# STEP 2: SELECT TUNING METHOD
+# set up train control object, which specifies training/testing technique
+train_control_svm <- trainControl(method = "LGOCV",
+                                  number = 3,
+                                  p = 0.50)
+
+```
+
+```{r svm_ex, cache = TRUE}
+# set seed, so that statistics don't keep changing for every analysis
+# (applies for models which might have random parameters)
+set.seed(2019)
+
+# start timer
+start_time <- Sys.time()
+
+# -----------------------------------------------------------------------------
+# STEP 3: TRAIN MODEL
+
+# use caret "train" function to train svm
+model_ex <- 
+  train(form = grd_truth ~ . - stat_id,
+        data = train_set_ex,
+        method = "svmRadial",
+        tuneGrid = tune_grid_svm,
+        trControl = train_control_svm,
+        metric = "Accuracy") # how to select among models
+
+# end timer
+total_time <- Sys.time() - start_time
+
+```
+
+```{r model_ex_print}
+# print out overall summary for tuning process
+model_ex
+
+```
+
+## Evaluate Model (on Testing Set)
+
+Now that we have selected values for our two tuning parameters (sigma = 0.0057,
+and cost penalty = 2), let's build our full model and evaluate its peformance.
+(Note that while we build and evaluated models earlier, these were only built on
+subsets (i.e of ~1250 entries) of the training dataset and evaluated on
+diferent subsets of that same training dataset (also of ~1250 entries). Now that
+we have selected our tuning parameters, we want to build a model with those parameters
+on the full training dataset (i.e. ~2500 entries) and evaluate its performance on
+the original training set we put aside at the beginning (also of ~2500 entries)).
+
+When we evaluate the performance of our tuned model on the holdout testing set, we
+see that it performs well. Its overall accuracy was significantly better than 
+chance: 63.2% [95% CI: 61.3, 65.1%]. And it performed well both in identifying 
+truths (i.e. sensitivity: 61.9%) and identifying lies
+(i.e. specificity: 64.6%). (I wondered if the rate of lie detection (specificity)
+was significantly higher than the rate of truth detection (sensitivity); however,
+a two sample test for equality of proportions revealed this was not the case,
+X^2 = 1.76, p = 0.184.)
+
+Finally, we can evaluate the quality of the model's guessing. When the model made 
+a prediction that a statement was a truth, it was correct more often than not 
+(i.e. precision or positive predictive value:
+63.6%). And when it made a prediction that a statement was a lie, it was also
+correct more often than not (i.e. negative predictive value: 62.9%). (Confidence
+intervals can easily be generated for these other four statistics as well (i.e. +/-
+z\*(sqrt(p\*(1-p)/n), where z = 1.96; I won't calculate these for this example,
+but I will do so below in our full analysis.)
+
+```{r svm_ex_conf, cache = FALSE}
+# note: https://stats.stackexchange.com/questions/52274/how-to-choose-a-predictive-model-after-k-fold-cross-validation
+# which makes clear that we retrain our final model selected after turning on ALL the training data
+
+# make predictions
+preds_ex <-
+  predict(object = model_ex,
+          newdata = test_set_ex,
+          type = "raw")
+      
+# record model performance
+conf_ex <-
+  confusionMatrix(data = preds_ex,
+                  reference = test_set_ex$grd_truth,
+                  positive = "truth")
+      
+# print confusion matrix
+conf_ex
+
+```
+
+```{r prop_test}
+# test whether sensitivity is better than specificity
+prop.test(x = c(807, 774),
+          n = c((807+443), (774+476)),
+          alternative = "two.sided")
+```
+
+
+# FULL (SVM Models)
+
+Let's now repeated the process from above 10 times, and evaluate the average
+performance of our SVM (radial basis) model across these 10 iterations.
+
+## Run 10 models
+
+Below is the code that runs through this modeling process 10 different times and
+saves the result from each round.
+
+```{r svm_full, cache = TRUE, eval = FALSE}
+# -----------------------------------------------------------------------------
+# STEP 0: set seed, so that statistics don't keep changing for every analysis
+set.seed(2019)
+
+# -----------------------------------------------------------------------------
+# STEP 1: decide how many times to run the model
+rounds <- 10
+
+# -----------------------------------------------------------------------------
+# STEP 2: set up object to store results
+# part a: create names of results to store
+result_cols <- c("model_type", "round", "accuracy", "accuracy_LL", "accuracy_UL",
+                 "sensitivity", "specificity", "precision", "npv", "n")
+
+# part b: create matrix
+results <-
+  matrix(nrow = rounds,
+         ncol = length(result_cols))
+
+# part c: actually name columns in results marix
+colnames(results) <- result_cols
+
+# part d: convert to df (so multiple variables of different types can be stored)
+results <- data.frame(results)
+
+# -----------------------------------------------------------------------------
+# STEP 2: start timer
+start_time <- Sys.time()
+
+# -----------------------------------------------------------------------------
+# STEP 3: create rounds number of models, and store results each time
+
+for (i in 1:rounds){
+  
+  # part a: partition data in 50-50 lgocv split (create index for test set)
+  index_train <- 
+    createDataPartition(y = stats_combo2$stat_id,
+                        p = 0.50,
+                        times = 1,
+                        list = FALSE)
+  
+  # part b: create testing and training data sets
+  train_set <- stats_combo2[index_train, ]
+  test_set <- stats_combo2[-index_train, ]
+  
+  
+  # part c: use caret "train" function to train logistic regression model
+  model <- 
+    train(form = grd_truth ~ . - stat_id,
+          data = train_set,
+          method = "svmRadial",
+          tuneGrid = tune_grid_svm,
+          trControl = train_control_svm,
+          metric = "Accuracy") # how to select among models)
+  
+  # part d: make predictions
+  preds <-
+    predict(object = model,
+            newdata = test_set,
+            type = "raw")
+  
+  # part e: store model performance
+  conf_m <-
+    confusionMatrix(data = preds,
+                    reference = test_set$grd_truth,
+                    positive = "truth")
+  
+  # part f: store model results
+  # model type
+  results[i, 1] <- "svm"
+  # round
+  results[i, 2] <- i
+  # accuracy
+  results[i, 3] <- conf_m$overall[1]
+  # accuracy LL
+  results[i, 4] <- conf_m$overall[3]
+  # accuracy UL
+  results[i, 5] <- conf_m$overall[4]
+  # sensitivity
+  results[i, 6] <- conf_m$byClass[1]
+  # specificity
+  results[i, 7] <- conf_m$byClass[2]
+  # precision
+  results[i, 8] <- conf_m$byClass[3]
+  # negative predictive value
+  results[i, 9] <- conf_m$byClass[4]
+  # sample size (of test set)
+  results[i, 10] <- sum(conf_m$table)
+  
+  # part g: print round and total elapsed time so far
+  cumul_time <- difftime(Sys.time(), start_time, units = "mins")
+  print(paste("round #", i, ": cumulative time ", round(cumul_time, 2), " mins",
+              sep = ""))
+  print("--------------------------------------")
+
+}
+
+```
+
+## View Results (Tabular)
+
+Below, I've displayed a raw tabular summary of the results from each of the 10 models.
+As before, there is some variability from model to model (e.g. our first model
+had an overall accuracy of 62.8%, while our second model had an overall accuracy of
+61.2%), but for overall story is one of consistency.
+
+```{r full_results}
+results
+  
+```
+
+## View Results (Graphically)
+
+The average SVM model performance across our the 10 iterations is plotted below,
+where our five primary performance statistics are highlighted (accuracy, sensitivity,
+specificity, precision and negative predictive value). All are significantly above
+50% (and we see that for overall accuracy, the lower bound of the 95% confidence
+interval is even above 60%).
+
+```{r viz_full_results}
+# calculate average sample size
+mean_n <- mean(results$n)
+
+# create df to use for visualization
+results_viz <-
+  results %>%
+  group_by(model_type) %>%
+  summarize(accuracy = mean(accuracy),
+            sensitivity = mean(sensitivity),
+            specificity = mean(specificity),
+            precision = mean(precision),
+            npv = mean(npv)) %>%
+  select(-model_type) %>%
+  gather(key = "perf_stat",
+         value = "value") %>%
+  mutate(value = as.numeric(value))
+
+# actual visualization
+ggplot(data = results_viz,
+  aes(x = perf_stat,
+           y = value)) +
+geom_point(size = 2,
+           color = "#545EDF") +
+geom_errorbar(aes(ymin = (value - 1.96*sqrt(value*(1-value)/mean_n)),
+                   ymax = (value + 1.96*sqrt(value*(1-value)/mean_n))),
+              color = "#545EDF",
+              width = 0.15,
+              size = 1.25) +
+geom_hline(yintercept = 0.5,
+           linetype = "dashed",
+           size = 0.5,
+           color = "red") +
+scale_y_continuous(breaks = seq(from = 0, to = 1, by = 0.05),
+                   limits = c(0, 1)) +
+scale_x_discrete(limits = rev(c("accuracy", "sensitivity", "specificity", 
+                            "precision", "npv"))) + 
+coord_flip() +
+theme(panel.grid.major.x = element_line(color = "grey",
+                                        size = 0.25),
+      panel.grid.minor.x = element_blank(),
+      panel.grid.major.y = element_blank(),
+      panel.background = element_blank(),
+      axis.ticks = element_blank(),
+      plot.title = element_text(hjust = 0.5),
+      axis.title.y = element_text(margin = 
+                                    margin(t = 0, r = 10, b = 0, l = 0)),
+      axis.title.x = element_text(margin = 
+                                    margin(t = 10, r = 00, b = 0, l = 0)),
+      axis.text.x = element_text(angle = 90)) +
+labs(title = "Performance Statistics (Support Vector Machine)",
+     x = "Performance Statistic",
+     y = "Proportion (0 to 1)")
+
+
+```
+
+# Save Results
+
+```{r save, eval = FALSE}
+# rename results df, to be particular to this model type (for disambiguation later)
+results_svm <- results
+
+# clear results variable
+rm(results)
+
+# save results in Rda file
+save(results_svm,
+     file = "results_svm.Rda")
+```
+
+# Render
+
+If needed, I can render with rmarkdown::render("hld_MODEL_svm.Rmd").
+
+# Citations
+
+* Bakshy, E., Messing, S., & Adamic, L. A. (2015). Exposure to ideologically 
+diverse news and opinion on Facebook. Science, 348(6239), 1130-1132. 
+https://doi.org/10.1126/science.aaa1160
+
+* Kuhn, M. (2008). Building predictive models in R using the caret package.
+Journal of Statistical Software, 28(5), 1-26.
+
+* Kuhn, M., & Johnson, K. (2013). Applied predictive modeling (Vol. 26). Springer.
+
+* Wu, X., Kumar, V., Quinlan, J. R., Ghosh, J., Yang, Q., Motoda, H., . Philip, S. Y. (2008). 
+Top 10 algorithms in data mining. Knowledge and Information Systems, 14(1), 1-37.
+
+
+# END

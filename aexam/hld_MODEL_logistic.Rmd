@@ -157,9 +157,6 @@ for calculating binomial proportion confidence intervals (Binomial proportion
 confidence interval, 2019); I won't calculate these for this example, but I will 
 do so below in our full analysis.)
 
-(Note: some of the point statistics referenced throughout ths analys)
-
-
 ```{r, cache = FALSE}
 # make predictions
 preds_ex <-

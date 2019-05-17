@@ -31,7 +31,7 @@ to predict binary outcomes (i.e. classify/separate the red circles and blue squa
 In cases where these two binary outcomes are perfectly seperable, an infinite number
 of lines can be generated that would indeed successfully separate these two classes (left panel).
 For each of these individual lines, we can imagine perpendicular lines radiating outwards
-from both ends. The distance that each of these lines can radiate outwards before
+from both sides. The distance that each of these lines can radiate outwards before
 they would bump into a data point is called the "margin". In each case, the bounds of 
 this margin are entirely determined by those nearest abutting data points, which are
 called "support vectors" (because they sort of "support" the margin; and hence the name
@@ -320,7 +320,7 @@ prop.test(x = c(807, 774),
 ```
 
 
-# FULL (Predictive Logistic Regression Models)
+# FULL (SVM Models)
 
 Let's now repeated the process from above 10 times, and evaluate the average
 performance of our SVM (radial basis) model across these 10 iterations.
@@ -530,6 +530,9 @@ If needed, I can render with rmarkdown::render("hld_MODEL_svm.Rmd").
 * Bakshy, E., Messing, S., & Adamic, L. A. (2015). Exposure to ideologically 
 diverse news and opinion on Facebook. Science, 348(6239), 1130-1132. 
 https://doi.org/10.1126/science.aaa1160
+
+* Kuhn, M. (2008). Building predictive models in R using the caret package.
+Journal of Statistical Software, 28(5), 1-26.
 
 * Kuhn, M., & Johnson, K. (2013). Applied predictive modeling (Vol. 26). Springer.
 
