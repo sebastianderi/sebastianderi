@@ -8,116 +8,58 @@ output:
 
 [return to [overview page](./hld_OVERVIEW.html)]
 
-Now that we are done cleaning and processing our data, we are ready to begin
-building models that can make predictions about whether individual statements 
-are truths or lies. Before building any of these specific models however, I
-will give an overview of  the general structure that this model building process 
-and how performance will be assessed in a way that allows
-comparison across different models.
+Now that we have extracted various features (sentiment, parts of speech,
+indvidual word counts) and these features have been cleaned, we are ready to use them 
+to build statistical models that can make binary predictions about whether individual 
+statements are truths or lies. Because these models will differ from each other
+(e.g. logistic regression v. neural nets), it is important to identify common
+criteria by which the performance of these different models can be assessed and thus
+compared. In this section my aim is to provide an overview of how we will 
+assess model performance.
 
-Very basically, the modeling process will have two basic steps. In the first, we
-will use some method to split our dataset into two portions -- one for building or 
-"training" the model, and the other for testing the model. The golden rule in
-predictive modeling is to never use the same data that the model was built on to
-assess the model's performance. There are many different strategies for how to
-split the data into training and test sets. I will review these in the first part of this
-section ("Training and Testing (Data Splitting)"). Once the data is split, we 
-then need to assess the performance of the model. I will review these in the 
-second part of this section ("Assessment").
+At a very high level, our modeling process will have two basic components. First,
+we build the model ("model training"). Second, we assess its performance ("model 
+testing"). 
 
-# Training and Testing (Data Splitting)
+(The model should be trained on separate data from the data it is tested on.
+In the final part of this section, "Data Splitting, for Model Training and Testing", 
+we will review various strategies for splitting a dataset into portions for testing 
+and training. For now, assume we have done this correctly and are at the model "testing" phase.)
 
-There are many different ways to split up the data. Which is best depends on the
-nature of the dataset and personal preference. Three major categories of data 
-splitting strategies are the following:
+The setup for model testing will always be the same. We will have a set
+of statements (from which various textual features have been extracted),
+our "testing set". For each statement in this testing set, the model will be fed 
+the value of the features for that statement (e.g. statement length, sentiment score),
+and it will spit out a prediction for each of those statements. We can then compare these 
+predictions to reality.
+Most obviously, we can look at overall accuracy (# correct predictions / #
+of predictions). But other important metrics exist as well: sensitivity, specificity,
+precision, and negative predictive value. I review these below, using example data.
 
-* k-fold cross validation
-* repeated training/testing splits
-* bootstrapping
+(Note, this is all occuring in the domain of "binary classification", and "classification"
+more generally. Models that perform classification aim to predict membership of items in
+discrete categories or "classes". Here, we are predicting whether a statement belongs in the class 
+"lies" or the class "truths". Other binary classification tasks might including predicting
+a whether a person will or will not default on a loan based on 
+their previous financial history. Not all classification tasks are binary; for example, 
+one might try to build
+a model that takes in images of animals and uses features extracted from those images,
+to predict what species of animal is in those pictures, e.g. dog, cat, elephant. And
+finally, an entirely different domain of prediction involves making predictions about
+continuous quantities, e.g. predicting someone's expected salary based on features like
+their education and previous employment history. Different metrics, like root mean
+squared error, are used to assess the performance of models that make predictions
+about continuous quantities. These are not covered here.)
 
-## K-fold cross validation
-
-In k-fold cross validation, we divide our entire data set into mutually exclusive
-(disjoint) sets.
-
-A very common type of cross validation is 10-fold cross validation, where the data set is split
-into 10 sections, 
-
-![](./pics/kuhn_p71_kfold.PNG)
-
-## Repeated training/testing splits
-
-![](./pics/kuhn_p72_repeated.PNG)
-
-## Bootstrapping
-
-In bootstrapping we build our training and testing sets by sampling 
-
-![](./pics/kuhn_p73_bootstrap.PNG)
-
-## Procedure For Our Models
-
-To assess the models I create here, I will keep constant the method of data splitting.
-And I plat to use repeated training/testing splits. Specifically, for each model,
-I will randomly split the dataset into equal halves (50-50 split), allocating one half
-for training and the other half for testing. For each model type (e.g. logistic regression),
-I will do this ten times, and the average performance across these 10 models will be recorded. 
-This will consitute the official performance of that model type. 
-
-I prefer this technique for a few reasons. First, we have a fairly large amount of
-data (5,004 rows). So we don't have to worry about trying to use as much of our data
-as possible for training (we have enough data to spare). Although bootstrapping is
-a perfectly legitimate technique for data splitting, I don't like how it leaves open the
-possibility that the same observation may wind up in both the training and test set.
-Further, bootstrapping is particularly useful in cases where data is limited (e.g.
-fewer number of observations), which is not the case here. That leaves a choice
-between k-fold cross validation and repeated testing/training splits. 
-
-
-Let's now discuss the different ways that model performance can be assessed.
-
-
-# Assessment
-
-Once this is done, we can assess the performance of that model in a number of
-ways. I now discuss some of the primary metrics we can use to assess
-model performance. An important (and I believe interesting) fact to take note
-of is that all the following metrics can be used to describe both our model's
-performance at lie detection and human performance in lie detection. In fact,
-I think trying to interpret each metric as a measure of human
-performance helps add a layer of understanding and meaning to each of the
-metrics that will be discussed.
-
-(Further, it should be noted that all of the performance metrics that I will
-describe are metrics used to assess performance of classification models;
-that is models that try to predict the class or group into which a set of
-samples belong, for example whether someone is likely to default on a
-loan or not based on a set of predictive features which may be either
-continuous or categorical. This is in contract to the other major category of
-predictive models, which aim to make predictions of numeric outcomes, 
-such as a person's future earnings based on their educational experience
-and standardized test scores.)
-
-
-## Overall Accuracy
-
-First, and most obviously, the easiest and most central way that each model
-will be assessed, will be by it's overall accuracy. That is, we count up
-the number of lies correctly predicted as lies and the number of truths
-correctly predicted as truths, and then divide them by the total number of
-statements we generated a prediction for. This is overall accuracy.
-
-I will try to summarize various performance metrics that I review
-visually. In order to do that, I need to generate some example data,
-which I now do below. This example data will take the form of
-an imaginary set of 100 statements, 50 of which are truths, and 50 of which
-are lies. And for each statement, we have generated a prediction as to
-whether that statement is a truth or a lie.
+(Interestingly, the metrics we will review for assessing model performance in our
+binary classification task can (and will) also be used to quantify human lie
+detection performance.)
 
 
 # Packages
 
-First, I wil start by loading some packages that will be used in this section.
+As usual I wil start with the house-keeping matter of loading some packages that
+will be used in this section.
 
 ```{r, message=FALSE, warning=FALSE}
 # before knitting: message = FALSE, warning = FALSE
@@ -126,9 +68,55 @@ library(ggthemes) # visualization
 
 ```
 
-# Generate Example Data
+# Confusion Matrix
 
-And next, I will generate some example data.
+We will focus on five key performance statistics (overall accuracy, sensitivity,
+specificity, precision, and negative predictive value). All of these statistics
+can be derived from a table that is central to evaluating performance in binary
+classification. This table is called a "confusion matrix" and is a 2x2 table that
+cross-tabulates predictions and actual outcomes (I use the terms "actual outcomes"
+and "reality" interchangeably throughout).
+
+For any other binary classification task, we can imagine we are trying to
+identify one of the two classes, which we refer to as "positive" cases. For example,
+in our present task, we might take the perspective that we are trying to identify
+which statements are true statements and call these our positive cases (making lies
+our "negative" cases). Thus, when we compare predictions to reality in binary classification
+there are only four possible outcomes: a positive case is correctly identified
+as a positive case (a "true positive"), a positive case is incorrectly identified
+as a negative case (a "false negative"), a negative case is correctly identified
+as a negative case (a "true negative"), and a negative case is incorrectly identified
+as a positive (a "false negative"). A confusion matrix simply counts up the
+number of times each of these four types of events happen.
+
+A generic example is shown below for how this confusion matrix would be filled out
+once predictions are made on set of statements in our datset.
+
+. | Prediction = Truth | Prediction = Lie
+--------------- | --------------- | --------------
+Reality = Truth | # True Positives | # False Negatives
+Reality = Lie | # False Positives  | # True Negatives
+
+To make things a little more concrete, imagine that we had a set of 100 statements, 
+50 of which are true, and 50 of which are lies. And we made a prediction about each of them,
+with the end result being 40 true statements correctly identified as true, 10 true statements 
+incorrectly identified as lies, 30 lies correctly identified as lies, and 20 lies incorrectly
+identified as truths. Our resultant confusion matrix would look like the following.
+
+. | Prediction = Truth | Prediction = Lie
+--------------- | --------------- | --------------
+Reality = Truth | 40 | 10
+Reality = Lie | 20 | 30
+
+# Performance Metrics
+
+We can also display this information visually, and use this to walk through
+the binary classification performance metrics.
+
+## Generate Example Data
+
+To do this, first, let's generate some example data (with the same distributions of
+40 true positives, 10 false negatives, 30 true negatives, and 20 false negatives).
 
 ```{r}
 # make matrix of the right shape
@@ -175,42 +163,20 @@ example <-
 # example
 ```
 
+## Visualize Example Data
 
-# Confusion Matrix
-
-Various central performance metrics which I will now describe are derived from an important
-table often used to summarize predictive performance in binary classification.
-This table is called a "confusion matrix" and is a 2x2 table that cross-tabulates
-predictions and actual outcomes (what I refer to as reality). The canonical
-form of this table is shown below. I will present a visual analog to this table
-as I go through the performance metrics on the example data.
-
-
-Reality (horizontal) | Reality = True | Reality = False
----------------------- | ---------------------- | ----------------------
-Predictions (vertical) | ---------------------- | ----------------------
-Prediction = True | # True Positives | # False Positive
-Prediction = False | # False Negatives | # True Negatives
-
-
-# Overall Accuracy
-
-Now, we can visualize overall accuracy in the chart below. In this chart,
-we see the colored boxes represent the underlying truth of each statement
-(green boxes are truthful statements, and red boxes are lies). The colorized
-circle represent predictions (green circles represent statements predicted
-to be truthful, and red circles represent statements predicted to be lies).
-Further, each statement is numbered and an X is placed through it if the
-prediction was incorrect, and a plus-sign is placed through it if the
-prediction was correct.
-
-Thus, here overall accuracy is the sum of all the boxes with a plus sign
-demarcation divided by the total number of boxes. Here that gives us 70%
-overall accuracy.
-
-
-Mathematically, overall accuracy is: (#true positives + #true negatives) / 
-(#true positives + #true negatives + #false positivess + #false negatives).
+In the visualization below, each of the 100 statements is visualized by an individual
+box (numbered in the upper right hand corner from 1 to 100). The color of box represents
+the underlying "reality" with regard to each statement (green boxes represent truthful 
+statements, and red boxes represent lies). The colored circles "within" these boxes 
+represent our predictions for each statment (green circles represent statements predicted
+to be truthful, and red circles represent statements predicted to be lies). We can
+compare reality to our predictions by compared the color of the box to the circles
+within them. If the colors match (e.g. green box with green circle in it), our prediction
+was correct; if the colors don't match (e.g. green box with red circle in it), our
+prediction was wrong. To make this clear, an X is placed through a box it if our 
+prediction was incorrect, and a plus-sign is placed through a box if our prediction was correct.
+Let's now walk through the key performance metrics.
 
 ```{r, fig.width=8, fig.height=5}
 # make plot
@@ -268,43 +234,111 @@ pred_plot
 
 ```
 
-# Sensitivity ("Truth Detection Rate")
+## Overall Accuracy
+
+Let's start with the most basic metric of performance -- overall accuracy. 
+In our diagram, overall accuracy is the sum of all our correct predictions (the
+boxes with a plus sign) divided by our total number of predictions (the boxes
+with a plus sign plus the boxes with an X). Here that gives us 70% overall accuracy.
+
+Mathematically, overall accuracy can also be thought of as: 
+
+$$\frac{\sum_{}^{}TRUEpositive + \sum_{}^{}TRUEnegative}{\sum_{}^{}TRUEpositive + \sum_{}^{}TRUEnegative + \sum_{}^{}FALSEpositive + \sum_{}^{}FALSEnegative}$$
+For our example data, this calculation is also depicted in the figure below. The total number of boxes within 
+the border of the solid black lines correspond the numerator in the equation above (70),
+and the total number of boxes within the border of the dotted black lines represent 
+the denominator (100).
+
+```{r, fig.width=8, fig.height=5}
+# print plot (with overall accuracy highlighted)
+pred_plot +
+  geom_rect(aes(xmin = 0,
+                xmax = 11,
+                ymin = 0,
+                ymax = 11),
+            fill = "transparent",
+            color = "black",
+            linetype = "dotted") +
+  geom_rect(aes(xmin = 0.25,
+                xmax = 8.5,
+                ymin = 0.25,
+                ymax = 5.5),
+            fill = "transparent",
+            color = "black",
+            linetype = "solid") +
+  geom_rect(aes(xmin = 0.25,
+                xmax = 6.5,
+                ymin = 5.5,
+                ymax = 11),
+            fill = "transparent",
+            color = "black",
+            linetype = "solid")
+
+```
+
+## Sensitivity ("Truth Detection Rate")
 
 Another useful meric by which classification models are assessed is sensitivity
-(also called "recall"). In binary classification, we are usually trying to
-detect some particular outcome. Sensitivity is the percent of all "positive" outcomes
+(also called "recall"). Sensitivity is the percent of all "positive" outcomes
 that we actually detect. Here is an example. When we put our luggage through the 
 x-ray machine at the airport, we can imagine that the machine is trying to
-detect whether our luggage has a gun in it or not. Sensitivity is the percent of
-all guns in suitcases that the x-ray machine actually finds. Such a machine could
-have very good overall accuracy simply by guessing that no one has a gun in their
-suitcase -- because the vast majority of people don't have guns in their suitcases.
+detect whether our luggage has a gun in it or not (presence of a gun is a "positive" case).
+Sensitivity is the percent of all guns in suitcases that the x-ray machine actually finds. 
+Such a machine could have very good overall accuracy simply by guessing that no one has
+a gun in their suitcase -- because the vast majority of people don't have guns in their suitcases.
 However, such a model would have poor sensitivity (in fact 0% sensitivity) because
-it would detect 0% of the suitcases that do have guns in them. In our case, what
-sensitivity means depends on how exactly we define our task. If our task is "truth
-detection" (that is, finding true statements), then sensitivity is the percent 
-of all true statements that we identify as true. (In the figure, the percent of 
-green boxes with a green circle in them, i.e. 80% here.)
-However, if we consider our task pure "lie detection", then sensitivity would be
+it would detect 0% of the suitcases that do have guns in them. 
+
+In our case, what sensitivity means depends on how we define our "positive" cases. 
+If our task is "truth detection" (i.e. truth are "positive" cases), then sensitivity is the percent 
+of all true statements that we correcntly predict to be true. In the figure, this 
+is the sum of the green boxes with a green circle in them, divided
+by all the green boxes (both those with a green circle in them and those with a 
+red circle in them). Here, that gives us 80%. (If our task were "lie detection" (i.e. lies
+were considered positive cases), then sensitivity would be
 the percent of all lies that we correctly identify as lies (red boxes with a 
-red dot in them). Unless stated otherwise,
-in this report, sensitivity will correspond to a task of "truth detection".
+red dot in them, divided by all red boxes). Unless stated otherwise,
+in this report, truths will always be considered "positive cases". And thus
+sensitivity will correspond to a task of "truth detection" (i.e. truths are positive cases).)
+
 Thus, in this particular case, we can think of sensitivity as the "truth
 detection rate" -- the percent of all true statements that we correctly identify as true.
 
-Mathematically, sensitivity is: (#true positives) / (#true positives + #false negatives).
+Mathematically, sensitivity is: 
+
+$$\frac{\sum_{}^{}TRUEpositive}{\sum_{}^{}TRUEpositive + \sum_{}^{}FALSEnegative}$$
+
+Again, for our example data, this calculation is also depicted in the figure. The total number of boxes within 
+the border of the solid black lines correspond the numerator in the equation above (40),
+and the total number of boxes within the border of the dotted black lines represent 
+the denominator (50).
+
 
 ```{r, fig.width=8, fig.height=5}
-pred_plot
+pred_plot +
+  geom_rect(aes(xmin = 0,
+                xmax = 11,
+                ymin = 0,
+                ymax = 5.5),
+            fill = "transparent",
+            color = "black",
+            linetype = "dotted") +
+  geom_rect(aes(xmin = 0.25,
+                xmax = 8.5,
+                ymin = 0.25,
+                ymax = 5.5),
+            fill = "transparent",
+            color = "black",
+            linetype = "solid")
 ```
 
 
-# Specificity ("Lie Detection Rate")
+## Specificity ("Lie Detection Rate")
 
 Specificity is the other side of the coin, in a sense, of sensitivity.
 Specificity is the percent of all "negative" cases that a model correctly identifies.
-To continue with the X-ray machine example from above (where the task is "gun detection"),
-specificity is the percent of all suitcases that do not have a gun, which we
+To continue with the X-ray machine example from above (where the task is "gun detection"
+in suitcases), specificity is the percent of all suitcases that do not have a gun, which we
 correctly identified as not having a gun. Again, if we turn off the X-ray
 machine and simply predict that no one has a gun, this "model" would have
 great (in fact, perfect, 100%) specificity. (Of course, to the detriment
@@ -313,20 +347,43 @@ between sensitivity and specificity. We are always between the extremes
 of being overbroad and identifying everything as a positive case, thus achieving
 high sensitivity at the cost of low specificity, or being overly conservative erring on
 the side of not identifying anything as a positive case, thus achieving high specificity
-at the expensive of low sensitivity.) In our case, if our task is "truth detection"
-(identifying true statements), then specificity is the proportion of all lies
-that we correctly identify as lies. This case be considered the "lie detection
-rate" in our case. In the figure below, this would be the 60% (the red boxes with
+at the expensive of low sensitivity. This tradeoff can be depicted with the use of
+ROC curves, although I will not go into that here.) 
+
+In our case, if our task is "truth detection" (identifying true statements), 
+then specificity is the proportion of all lies
+that we correctly identify as lies. Thus, here we can think of specificity as 
+the "lie detection rate" of our model. For our example data of 100 statements that
+we can have been working with this would be the 60% (the red boxes with
 a red dot, divided by all the red boxes).
 
-Mathematically, specificity is: (#true negatives) / (#true negatives + #false positives).
+Mathematically, specificity is:
+$$\frac{\sum_{}^{}TRUEnegative}{\sum_{}^{}TRUEnegative + \sum_{}^{}FALSEpositive}$$
 
+Again, for our example data, this calculation is also depicted in the figure. The total number of boxes within 
+the border of the solid black lines correspond the numerator in the equation above (30),
+and the total number of boxes within the border of the dotted black lines represent 
+the denominator (50).
 
 ```{r}
-pred_plot
+pred_plot +
+  geom_rect(aes(xmin = 0,
+                xmax = 11,
+                ymin = 5.5,
+                ymax = 11),
+            fill = "transparent",
+            color = "black",
+            linetype = "dotted") +
+  geom_rect(aes(xmin = 0.25,
+                xmax = 6.5,
+                ymin = 5.5,
+                ymax = 11),
+            fill = "transparent",
+            color = "black",
+            linetype = "solid")
 ```
 
-# Precision ("Non-Gullibility")
+## Precision ("Non-Gullibility")
 
 In a sense, the previous metrics focused on outcomes. That is, we looked at metrics
 that assessed how well our model could identity positive cases (sensitivity, e.g. "truths")
@@ -334,47 +391,110 @@ or how well our model could identify negative cases (specificity, e.g. "lies").
 These next two metrics are more focused on predictions. The first such metric I will
 explain is "precision" (also called positive predictive value). Most simply,
 this can be thought of as the percent of times that a model is correct
-when it predicts a "positive outcome". To continue with the x-ray machine example,
+when it predicts a "positive" outcome. To continue with the x-ray machine example,
 it is the percentage of times that, after the machine beeps (predicts a suitcase
-has a gun), that suitcase actually has a gun. In our case, assuming our task is
-"truth detection", it is the percent of the time that a statement is true given
-that we've predicted the statement is true. It can be thought of a metric of
-non-gullibility. If someone is not gullible, then they have high precision (a large
-proportion of the statements they predict to be true are in fact true). In the
-figure below, precision, is the proportion of green circles that also have a
-green square behind them (66.7%).
+has a gun), that suitcase actually has a gun. 
 
-Mathematically, precision is: (#true positives) / (#true positives + #false positives).
+In our case, assuming our task is
+"truth detection", it is the percent of the time that a statement is true given
+that we've predicted the statement is true. It can be thought as measuring a model's
+"non-gullibility". If someone is not gullible, then they have high precision (a large
+proportion of the statements they predict to be true are in fact true). In the
+figure below for our example data, precision, is the sum of all green boxes with a
+green circle in them divided by all boxes which have a green circle in them (66.7%).
+
+Mathematically, precision is:
+
+$$\frac{\sum_{}^{}TRUEpositive}{\sum_{}^{}TRUEpositive + \sum_{}^{}FALSEpositive}$$
+
+Again, for our example data, this calculation is also depicted in the figure.
+The total number of boxes within the border of the solid black lines correspond 
+the numerator in the equation above (40),
+and the total number of boxes within the border of the dotted black lines represent 
+the denominator (60).
 
 ```{r}
-pred_plot
+pred_plot +
+  geom_rect(aes(xmin = 0,
+                xmax = 8.5,
+                ymin = 0,
+                ymax = 5.5),
+            fill = "transparent",
+            color = "black",
+            linetype = "dotted") +
+  geom_rect(aes(xmin = 6.5,
+                xmax = 11,
+                ymin = 5.5,
+                ymax = 11),
+            fill = "transparent",
+            color = "black",
+            linetype = "dotted") +
+  geom_rect(aes(xmin = 0.25,
+                xmax = 8.4,
+                ymin = 0.25,
+                ymax = 5.4),
+            fill = "transparent",
+            color = "black",
+            linetype = "solid")
 ```
 
 
-# Negative Predictive Value ("Well-Founded Skepticism")
+## Negative Predictive Value ("Well-Founded Skepticism")
 
 Again, there is another side of the coin to the precision metric, as there
 was for the sensitivity metric. Negative predictive value is, in a sense,
 the other side of the coin of precision. It measures of the percent of
 cases that are labeled as "negative" which are true negatives. In the x-ray example,
 it is the proportion of times when a suitcase does not set off the machine's alarm
-that the suitcase actually does not have a gun in it. In our case, 
+that the suitcase actually does not have a gun in it. 
+
+In our case, 
 assuming again our task is "truth detection", negative predictive value is the proportion
 of statements that we predict to be lies which are actually lies. Negative predictive
-value can be thought of as "well-founded skepticism" in our case. If someone is high
+value can be thought of as "well-founded skepticism". If someone is high
 in well-founded skepticism (negative predictive value), a large portion of the
 statements they believe to be lies turn out in fact to be lies. In the figure
-below, negative predictive value is the proportion of red circles that also
-have a red square behind them (75%).
+below, negative predictive value is the total number of red boxes that also have
+a red circle in them divided by the total number of boxes with a red circle in them
+(75%).
 
-Mathematically, negative predictive value is: (#true negatives) / (#true negatives + #false negatives).
+Mathematically, negative predictive value is:
+
+$$\frac{\sum_{}^{}TRUEnegative}{\sum_{}^{}TRUEnegative + \sum_{}^{}FALSEnegative}$$
+
+Again, for our example data, this calculation is also depicted in the figure.
+The total number of boxes within the border of the solid black lines correspond 
+the numerator in the equation above (30),
+and the total number of boxes within the border of the dotted black lines represent 
+the denominator (40).
 
 ```{r}
-pred_plot
+pred_plot +
+  geom_rect(aes(xmin = 8.5,
+                xmax = 11,
+                ymin = 0,
+                ymax = 5.5),
+            fill = "transparent",
+            color = "black",
+            linetype = "dotted") +
+  geom_rect(aes(xmin = 0,
+                xmax = 6.5,
+                ymin = 5.5,
+                ymax = 11),
+            fill = "transparent",
+            color = "black",
+            linetype = "dotted") +
+  geom_rect(aes(xmin = 0.25,
+                xmax = 6.4,
+                ymin = 5.6,
+                ymax = 10.75),
+            fill = "transparent",
+            color = "black",
+            linetype = "solid")
 ```
 
 
-# Other metrics
+## Other performance metrics
 
 There are a host of other important metrics and tools to assess classification performance,
 which I will not discuss for the time being -- but are nevertheless useful and 
@@ -386,6 +506,62 @@ these include:
 * ROC curves
 * AUC (area under the curve)
 * Calibration Plots
+
+# Data Splitting, for Model Training and Testing
+
+All of the above presupposes that we have trained our model on a certain portion
+of our data and then tested it on a separate portion of our data. However, there
+are actually any way to conduct this split.
+
+The golden rule in predictive modeling is to never use the same data that the model was built on to
+assess the model's performance. There are many different strategies for how to
+split the data into training and test sets.
+
+There are many different ways to split up the data. Which is best depends on the
+nature of the dataset and personal preference. Three major categories of data 
+splitting strategies are the following:
+
+* k-fold cross validation
+* repeated training/testing splits
+* bootstrapping
+
+## K-fold cross validation
+
+In k-fold cross validation, we divide our entire data set into mutually exclusive
+(disjoint) sets.
+
+A very common type of cross validation is 10-fold cross validation, where the data set is split
+into 10 sections, 
+
+![](./pics/kuhn_p71_kfold.PNG)
+
+## Repeated training/testing splits
+
+![](./pics/kuhn_p72_repeated.PNG)
+
+## Bootstrapping
+
+In bootstrapping we build our training and testing sets by sampling 
+
+![](./pics/kuhn_p73_bootstrap.PNG)
+
+## Procedure For Our Models
+
+To assess the models I create here, I will keep constant the method of data splitting.
+And I plat to use repeated training/testing splits. Specifically, for each model,
+I will randomly split the dataset into equal halves (50-50 split), allocating one half
+for training and the other half for testing. For each model type (e.g. logistic regression),
+I will do this ten times, and the average performance across these 10 models will be recorded. 
+This will consitute the official performance of that model type. 
+
+I prefer this technique for a few reasons. First, we have a fairly large amount of
+data (5,004 rows). So we don't have to worry about trying to use as much of our data
+as possible for training (we have enough data to spare). Although bootstrapping is
+a perfectly legitimate technique for data splitting, I don't like how it leaves open the
+possibility that the same observation may wind up in both the training and test set.
+Further, bootstrapping is particularly useful in cases where data is limited (e.g.
+fewer number of observations), which is not the case here. That leaves a choice
+between k-fold cross validation and repeated testing/training splits. 
 
 
 
@@ -401,9 +577,9 @@ Retrieved from https://en.wikipedia.org/w/index.php?title=Sensitivity_and_specif
 * Confusion matrix. (2018). In Wikipedia.
 Retrieved from https://en.wikipedia.org/w/index.php?title=Confusion_matrix&oldid=865598510
 
-* Kuhn, M., & Johnson, K. (2013). Applied predictive modeling (Vol. 26). Springer. (Chapter 11:
-Measuring Performance in Clasification Models)
-
+* Kuhn, M., & Johnson, K. (2013). Applied predictive modeling (Vol. 26). Springer.
+(see Chapter 11: Measuring Performance in Classification Models &
+Chapter 4: Overfitting and Model Tuning)
 
 # END
 
