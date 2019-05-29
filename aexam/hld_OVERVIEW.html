@@ -194,14 +194,16 @@ $(document).ready(function () {
 
 <div id="overview" class="section level1">
 <h1>Overview</h1>
-<p>Communication involves the exchange of information between two or more parties. An important part of this information exchange involves judging the truth-value or reliability of information that is received (Crawford &amp; Sobel, 1982). Thus, in the process of communication, many communicators are engaging to some extent in “lie detection” as they communicate.</p>
-<p>How “good” people are at lie detection is an open question and one that receives different answers depending on where and how you look (Bond, &amp; DePaulo, 2006; ten Brinke, Vohs, &amp; Carney, 2016; Vrij &amp; Granhag, 2012). In the “real world”, information is often communicated via face-to-face conversations that allow for receivers to observe and judge various types of information present: visual information about the speaker’s facial expressions, auditory information about the tone and pitch of the speaker’s voice, as well as the literal statements themselves made by the speaker. While all of these may provide useful information about the potential truth value of a communication, the truth value to be judged is ultimately in these statements themselves – which can be captured strictly as text (e.g. written sentences).</p>
-<p>In this report, I focus on “lie detection” based on evaluations of only such textual written statements. Specifically, the intention is to compare the “lie detection” performance of various decision-making agents: humans, computers (i.e. statistical models trained on text), and hybrid configurations that incorporate both human and computational judgments. Their performance will be evaluated on a specific data set of textual truth and lie statements that I have collected. A bulk of the work will be in building a framework that parses the text and then builds a statistical model to predict truths and lies (i.e. creating and assessing the computer model).</p>
-<p>We are less focused here on explanation. And our question is more akin to one about group decision making. However, here the groups consist not of the combination of different people but of the combination of different decision making agents: humans and computers. I believe that the resources of these different agents can be combined for more effective lie detection than either one is capable of alone. I believe this becuase all that is requred for a such a result is for the following conditions to hold: (1) computer models can be trained to predict lies better than chance, (2) humans can make predict lies better than chance, (3) the basis of these two predictions (computer and human predictions) are independent. This latter condition seems especially likely to be true, to me. Our computer models will be trained on very rudimentary textual features, while our humans will make judgements based on their knowledge of the word and personal experience (e.g. “why would a person in that situation do that? seems like a lie”) – something which our computers certain do not have.</p>
+<p>Communication is a core element of human interaction. And those communicating often have to judge whether what they are being told is true. This task can be called “lie detection” (or truth detection, if you prefer). An interesting question is how good people are at lie detection, and how they might do better.</p>
+<p>To that end, in this report, I compare human lie detection with various alternatives. More specifically, I compare (1) human lie detection accuracy to the accuracy that can be achieved by (2) computer models, and (3) and “hybrid” human-computer models (that incorporate both human judgement and computationally derived information).</p>
+<p>In the “real world”, communication typically occurs via face-to-face conversations wherein a great deal of information is available in addition to the literal communicated statements themselves: facial expressions, the tone and pitch of a person’s voice and so on. While all of these may provide cues as to the truth or falsity of a statement, the truth value to be judged is ultimately in these statements themselves – which can be captured strictly as text, i.e. written sentences. In this report, I focus on lie detection of this variety – truth-lie judgments of written statements. Partly, this is a matter of convenience (as this type of data is easier to collect) and partly it is a matter of trying to keep things simple.</p>
+<p>Human, computer, and hybrid human-computer performance will be evaluated on a specific data set of written statements that I have collected. A bulk of the work will be in extracting useful textual features from these statements and then constructing statistical models that can use these features to make truth-lie predictions.</p>
+<p>My focus here is on performance. I want to know which type of decision making agent achieves the highest levels of lie detection accuracy – humans, computers, or hybrid human-computer models. I believe that the best performance can be achieved by hybrid human-computer models. I expect this result because I expect following three conditions to hold: (1) humans will perform better than chance, (2) computer models will perform better than chance, (3) the bases of human judgments and computer judgments will differ. While there is debate about human lie detection accuracy and how exactly to measure it (Vrij &amp; Granhag, 2012), there is credible research which suggests that humans’ overall accuracy rate in truth-lie detection is better than chance (e.g. Bond &amp; DePaulo, 2006 find an overall accuracy rate of 54% in an analysis of 24,483 judgments from 206 papers; see also: ten Brinke, Vohs, &amp; Carney, 2016). Likewise, others have built computer models that are able to perform significantly better than chance at truth-lie detection (e.g. Mihalcea &amp; Strapparava, 2009; Newman, Pennebaker, Berry, &amp; Richards, 2003). Finally, it is certain that human and computer judgments are formed on different bases. Previous computer models have been trained on very rudimentary textual features which can be extracted from the words in a sentence (e.g. sentiment and parts of speech), as our model will be. In contrast, humans do not primarily attend to things like the number of adverbs in a sentence when making truth-lie judgments. They are likely attend to a host of factors when making truth-lie judgments that computer models, as yet, cannot and do not incorporate – notably, they can contrast the claims put forth in statements with their general knowledge of the world and personal experiences (e.g. “why would a person in that situation do that? this seems like a lie”).</p>
+<p>For these reasons, I suspect that hybrid human-computer models will be outperform both humans alone and computers alone. To my knowledge, this has not been demonstrated before.</p>
 </div>
 <div id="sections" class="section level1">
 <h1>Sections</h1>
-<p>That analysis is broken down into the following major sections, which build on each other sequentially.</p>
+<p>This report is broken down into the following major sections, which build on each other sequentially.</p>
 <ul>
 <li><a href="./hld_DATAGEN.html">Data Generation</a></li>
 <li><a href="./hld_DATAOVERVIEW.html">Data Overview</a></li>
@@ -226,19 +228,20 @@ $(document).ready(function () {
 </ul></li>
 </ul></li>
 <li><a href="./hld_HUMAN_perf.html">Human Performance</a></li>
-<li>Hybrid Performance
+<li><a href="./hld_HUMAN_MODEL_comparison.html">Comparison of Human and Computer Performance</a></li>
+<li><a href="./hld_HMODEL_overview.html">Hybrid Performance</a>
 <ul>
-<li><a href="./hld_MODEL_logistic.html">Logistic Regression Hybrid Model</a></li>
-<li><a href="./hld_MODEL_svm.html">Support Vector Machine Hybrid Model</a></li>
-<li><a href="/.hld_MODEL_neural.html">Neural Network Hyrbid</a></li>
-<li><a href="./hld_MODEL_comparison.html">Comparison of All Hybrid Models</a></li>
+<li><a href="./hld_HMODEL_logistic.html">Logistic Regression Hybrid Model</a></li>
+<li><a href="./hld_HMODEL_svm.html">Support Vector Machine Hybrid Model</a></li>
+<li><a href="/.hld_HMODEL_neural.html">Neural Network Hyrbid</a></li>
+<li><a href="./hld_HMODEL_comparison.html">Comparison of All Hybrid Models</a></li>
 </ul></li>
 </ul>
 </div>
 <div id="format" class="section level1">
 <h1>Format</h1>
-<p>The format of this report is such that it allows me to walk through the analysis process step by step. The exposition takes the form of a series of inter-connected data analysis files (R Notebook files) that can be displayed in a “web page” like format (i.e. as html files) – which allows me to interweave verbal exposition of the analysis with the actual code needed to execute that analysis. Another benefit of exposition in this form is that it allows me to do the analysis in a highly reproducible way; every step is documented in a systematic sequential fashion, such that not only should any researcher be able to follow along and see how each result is attained but also, if they were to so choose, they should be able to reproduce the entirely of the results themselves from simply the raw data and these analysis files – without any need for guesswork or adjustment.</p>
-<p>(As a result of this, however, some sections might also include more granular and tedious information than you, the reader, might be interested in. Feel free to skip over any sections or notes that seem tedious or trivial. The construction of this document was a learning process for me, so if anything seems condescendingly simple, assuming it is because I am explaining or reminding myself of something.)</p>
+<p>The exposition takes the form of a series of inter-connected data analysis files (R Notebook files) that can be displayed in a “web page” like format (i.e. as html files) – which allows me to interweave verbal exposition of the analysis with the actual code needed to execute that analysis. One benefit of exposition in this form is that it allows me to do the analysis in a highly reproducible way; every step is documented in a systematic sequential fashion, such that not only should any researcher be able to follow along and see how each result is attained but also, if they were to so choose, they should be able to reproduce the entirely of the results themselves from simply the raw data and these analysis files – without any need for guesswork or adjustment.</p>
+<p>(As a result of this, however, some sections might also include more granular and tedious information than you, the reader, might be interested in. Feel free to skip over any sections or notes that seem tedious or trivial. The construction of this document was a learning process for me, so if anything seems condescendingly simple, assume it is because I am explaining or reminding myself of something.)</p>
 </div>
 <div id="resources" class="section level1">
 <h1>Resources</h1>
@@ -246,7 +249,7 @@ $(document).ready(function () {
 <ul>
 <li><p>Kuhn, M., &amp; Johnson, K. (2013). Applied predictive modeling (Vol. 26). Springer.</p></li>
 <li><p>Silge, J., &amp; Robinson, D. (2016). tidytext: Text mining and analysis using tidy data principles in r. The Journal of Open Source Software, 1(3), 37.</p></li>
-<li><p>Venables, W. ., Smith, D. M., &amp; R Core Team. (2018). An Introduction to R Notes on R: A Programming Environment for Data Analysis and Graphics Version 3.5.1 (2018-07-02). Retrieved from <a href="https://cran.r-project.org/doc/manuals/r-release/R-intro.pdf" class="uri">https://cran.r-project.org/doc/manuals/r-release/R-intro.pdf</a></p></li>
+<li><p>Venables, W., Smith, D. M., &amp; R Core Team. (2018). An Introduction to R Notes on R: A Programming Environment for Data Analysis and Graphics Version 3.5.1 (2018-07-02). Retrieved from <a href="https://cran.r-project.org/doc/manuals/r-release/R-intro.pdf" class="uri">https://cran.r-project.org/doc/manuals/r-release/R-intro.pdf</a></p></li>
 <li><p>Wickham, H., &amp; Grolemund, G. (2016). R for data science: import, tidy, transform, visualize, and model data. O’Reilly Media, Inc.</p></li>
 </ul>
 </div>
@@ -254,7 +257,8 @@ $(document).ready(function () {
 <h1>References</h1>
 <ul>
 <li><p>Bond Jr, C. F., &amp; DePaulo, B. M. (2006). Accuracy of deception judgments. Personality and social psychology Review, 10(3), 214-234.</p></li>
-<li><p>Crawford, V. P.; Sobel, J. (1982). “Strategic Information Transmission”. Econometrica. 50 (6): 1431-1451. CiteSeerX 10.1.1.461.9770. <a href="doi:10.2307/1913390" class="uri">doi:10.2307/1913390</a></p></li>
+<li><p>Mihalcea, R., &amp; Strapparava, C. (2009). The lie detector: Explorations in the automatic recognition of deceptive language. In Proceedings of the ACL-IJCNLP 2009 Conference Short Papers (pp. 309-312). Association for Computational Linguistics.</p></li>
+<li><p>Newman, M. L., Pennebaker, J. W., Berry, D. S., &amp; Richards, J. M. (2003). Lying words: Predicting deception from linguistic styles. Personality and social psychology bulletin, 29(5), 665-675.</p></li>
 <li><p>ten Brinke, L., Vohs, K. D., &amp; Carney, D. R. (2016). Can ordinary people detect deception after all?. Trends in cognitive sciences, 20(8), 579-588.</p></li>
 <li><p>Vrij, A., &amp; Granhag, P. A. (2012). Eliciting cues to deception and truth: What matters are the questions asked. Journal of Applied Research in Memory and Cognition, 1(2), 110-117.</p></li>
 </ul>
