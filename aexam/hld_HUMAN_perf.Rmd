@@ -9,15 +9,61 @@ output:
 
 [return to [overview page](./hld_OVERVIEW.html)]
 
-I will now move on to building predictive models, to use the features
-that we just just extracted from the text, to build predictive models of
-which statements are lies and which statements are truths.
+In this section, I examine the accuracy of humans in truth and lie detection.
+To do this, I first needed people to judge the statements in our corpus. This was done 
+with the help of three research assistants (Alexis Levine, Emem-Esther Ikpot, 
+and Catherine Seita). I describe the procedure by which they rendered judgments 
+in more detail below. This is followed by an analysis of their performance.
+
+# Procedure
+
+To begin, I randomly sorted the full set of 5,004 statements. I then
+divided this randomly sorted list of statements into three non-overlapping sets. 
+I assigned one RA to each given segment. And I asked them go through the statements 
+within their segment, one statement at a time. For each statement, they were asked
+to make two judgments. First, they made a binary judgment, a guess, about whether 
+the statement was a truth or a lie. Second, they assessed how confident they were
+in their guess. The research assistants assessed their confidence by responding to the
+question "How confident are you in your guess?", to which they could pick one of five
+responses: "0 = Not at all confident; 1 = Slightly confident; 2 = Somewhat confident;
+3 = Fairly confident; 4 = Very confident".
+
+They were given the following general instruction about how they should orient
+their guessing.
+
+> "Each of these statements represent a person's response to a question that was asked of them. Sometimes those people responded to the question truthfully (i.e. by telling the truth) and sometimes they responded to the question untruthfully (i.e. by telling a lie).
+
+> We would like for you to go through each of these statements, one at a time. First, read the statement thoroughly. And then, give us your best guess as to whether that statement is true (i.e. a case where the person responded to the question by telling the truth) or that statement is a lie (i.e. a case where the person responded to the question by telling a lie). Then, move on to the next statement and do the same.
+
+> For each statement, you may make this guess on whatever basis you choose (i.e. on intuition and "gut" feeling, careful deliberation, or any other basis of deciding). What is simply most important is that you give us your best guess as to what you think is more likely - that the person's statement is a truth or a that the person's statement is a lie."
+
+Research assistants recorded their responses in an excel sheet, pictured below.
+
+![](./pics/guesses_excel.PNG)
+
+Note that participants were not given any information about the questions to which 
+each statement was a response. They simply read the statements and rendered their 
+guesses. This was done so that any eventual comparison between human and computer 
+performance would be on more equal footing. The computer models I have built and 
+the primary additional ones I plan to build do not take into account any information
+about the question to which statements are a response. That is, the models do not
+include anything like an indicator variable for each question, a question by feature
+interaction term for predictors, a hierarchical model structure which factors in
+question or anything else whereby the model would account for the different question 
+to which statements are a response.  As far as the computer knows, there are just 
+statements. (In later analysis, I do plan on building models that do account for 
+each question.) Because the models do not account for questions, it seemed only
+fair that humans should not get any information about questions either.
+
+As of the time of this writing, the research assistants did not render a judgment
+for each of the 5,004 statements. However, over 3,000 statements were evaluated,
+providing a solid basis to start the analysis, with which I now proceed.
 
 # Packages
 
 Again, I will start by loading relevant packages.
 
-```{r, message=FALSE, warning=FALSE}
+```{r packages, message=FALSE, warning=FALSE}
 # before knitting: message = FALSE, warning = FALSE
 library(tidyverse) # cleaning and visualization
 library(ggthemes) # visualization
@@ -28,10 +74,12 @@ library(skimr) # for dope ass summary stats
 
 # Load Data
 
-First, I will load the various cleaned versions of the data we just
-created.
+First, I will load in the excel sheets on which each of the research assistants
+recorded their responses. (And also another file which contains some other
+useful information about each statement -- namely, the actual ground truth for 
+each statement, which we'll need to assess performance.)
 
-```{r}
+```{r load_excel, cache = TRUE}
 # load in guesses from RAs
 stats_emem <- 
   read.xlsx("guesses_EMEM.xlsx",
@@ -55,7 +103,16 @@ load("stats_clean.Rda")
 
 # Clean Data
 
-```{r}
+In this section, I clean up and format the research assistant's responses. I then 
+combine these responses into one data object. The entries in this data object
+are printed below.
+
+(A note: there were actually a set of 100 statements for which two research assistants,
+Emem and Catherine, both registered responses. This was not an accident. Rather, the
+purpose was to use this to later examine consistency in guessing between different
+guessers. For the main analyses, these 100 statements are excluded.)
+
+```{r clean_format}
 # rename columns in emem file
 stats_emem_clean <-
   stats_emem %>%
@@ -127,7 +184,11 @@ stats_guess
 
 # Lies From Each Person
 
-```{r}
+First, let's just look at how many statements were evaluated. We see that truth-lie
+predictions (and confidence judgments) were made for 3,663 statements -- with 1,605
+of these guesses from Catherine, 1299 from Emem, and 759 from Lexi.
+
+```{r count_totals}
 stats_guess %>%
   dplyr::count(person) %>%
   arrange(desc(n))
@@ -136,7 +197,29 @@ stats_guess %>%
 
 # Overall Performance
 
-```{r}
+Now let's examine how well the human guessers performed, by comparing their guesses
+to reality. When we do this, we see that their overall accuracy was 55.5% 
+(2033 correct out of 3,663 guesses), which is significantly higher than 50%, 
+p < 0.001 (using an exact binomial test). Interestingly, sensitivity (70.0%), i.e.
+accuracy among truths, is much higher than specificity (41.0%), i.e. accuracy
+among lies; indeed this difference is significant, chi-squared = 311.15, p < 0.001. 
+While sensitivity was significantly higher than 50%, p <0.001 (binomial test), 
+sensitivity was actually significant below 50%, p < 0.001 (binomial test).
+These asymmetry in correctly identify truths as truth compared to correctly
+identifying lies as lies is found consistently in the lie detection literature
+(Bond & DePaulo, 2006; Levine, Park, & McCornack, 1999). For some reason, people
+are better at idenifying truths than lies. I am not aware of any definitive account
+of why this occurs. But it is my hypothesis that in the course of natural speech
+people encounter many more truthful statements than lies (imagine how chaotic
+and unpleasant communication would be if 50% of the things people said were lies).
+And thus people are calibrated toward a base rate where statements are much more
+likely to be true than untrue, and so tend to err on the side of assuming that
+a communication is truthful unless there is some strong reason to believe
+otherwise. (Note that nowhere in the instructions or materials were participants
+told that the ratio of truths to lies in this data set was 50:50. Nor did participants
+receive feedback on their guesses after each one was made.)
+
+```{r overall_conf_mat}
 # save confusion matrix with performance stats
 human_conf <-
   confusionMatrix(data = stats_guess$predict,
@@ -148,9 +231,79 @@ human_conf
 
 ```
 
+```{r binom_overall}
+# calculate relevant values for binomial test
+correct = human_conf$table[1] + human_conf$table[4]
+total = sum(human_conf$table)
+
+# examine overall accuracy with exact binomial test
+binom.test(x = correct,
+           n = total,
+           p = 0.5,
+           alternative = "two.sided",
+           conf.level = 0.95)
+
+```
+
+```{r chi_square_sens_v_spec}
+# calculate values relevant for test
+truth_correct = human_conf$table[4]
+truth_total = human_conf$table[3] + human_conf$table[4]
+lie_correct = human_conf$table[1]
+lie_total = human_conf$table[1] + human_conf$table[2]
+
+# calulate some other relevant values (for later use, in both visualization and later tests)
+# calculate values relevant for test
+total_truth_guesses = human_conf$table[2] + human_conf$table[4]
+total_lie_guesses = human_conf$table[1] + human_conf$table[3]
+
+
+# conduct actual test 
+# (more info: https://www.r-bloggers.com/comparison-of-two-proportions-parametric-z-test-and-non-parametric-chi-squared-methods/)
+prop.test(x = c(truth_correct, lie_correct),
+          n = c(truth_total, lie_total),
+          alternative = "two.sided",
+          conf.level = 0.95)
+  
+```
+
+```{r binom_sens}
+# binom test comparing sensitivity to chance
+binom.test(x = truth_correct,
+           n = truth_total,
+           p = 0.5,
+           alternative = "two.sided",
+           conf.level = 0.95)
+```
+
+```{r binom_spec}
+# binom test comparing specificity to chance
+binom.test(x = lie_correct,
+           n = lie_total,
+           p = 0.5,
+           alternative = "two.sided",
+           conf.level = 0.95)
+```
+
+
 # Overall Performance (Visualization)
 
-```{r}
+Below, I have simply visualized the basic performance statistics from above.
+In addition to seeing again the overall accuracy is above chance, while 
+sensitivity and specificity are far apart with the former above 50% and the
+latter below, we also see both precision (accuracy rate when guessing that a
+statement is true) and negative preditive value (accuracy rate when guessing
+that a statement is false) are above 50% (p<0.001 for both, by exact binomial
+test). Negative predictive value appears to be slightly higher than precision,
+although this different is just barely below theshold of significance, chi-squared
+= 4.06, p = 0.044, so it might not prove a robust effect. Speculatively, it might
+be that negative predictive value is higher than precision because people guess
+that way fewer statements are lies than truths (1300 v. 2363). Thus, they may
+only make a guess that a statement is a lie when they are really sure of it --
+and they may be more accurate when they are more sure. Nevertheless, more data 
+is needed to speak to this definitively.
+
+```{r prep_viz}
 # -----------------------------------------------------------------------------
 # STEP 1: make df to store results (organize with same columns as computer model results df's)
 # part a: create names of results to store
@@ -193,7 +346,8 @@ results[1, 10] <- sum(human_conf$table)
 
 ```
 
-```{r}
+
+```{r overall_viz}
 # -----------------------------------------------------------------------------
 # STEP 3: actual visualization
 # step a: create df to use for visualization
@@ -210,8 +364,16 @@ ggplot(data = results_viz,
            y = value)) +
 geom_point(size = 2,
            color = "#545EDF") +
-geom_errorbar(aes(ymin = (value - 1.96*sqrt(value*(1-value)/results$n)),
-                   ymax = (value + 1.96*sqrt(value*(1-value)/results$n))),
+geom_errorbar(aes(ymin = (value - 1.96*sqrt(value*(1-value)/c(results$n, 
+                                                              truth_total,
+                                                              lie_total,
+                                                              total_truth_guesses,
+                                                              total_lie_guesses))),
+                   ymax = (value + 1.96*sqrt(value*(1-value)/c(results$n, 
+                                                              truth_total,
+                                                              lie_total,
+                                                              total_truth_guesses,
+                                                              total_lie_guesses)))),
               color = "#545EDF",
               width = 0.15,
               size = 1.25) +
@@ -243,10 +405,42 @@ labs(title = "Performance Statistics (Human Guessing)",
 
 ```
 
+```{r binom_prec}
+# calculate values relevant for test
+total_truth_guesses = human_conf$table[2] + human_conf$table[4]
+total_lie_guesses = human_conf$table[1] + human_conf$table[3]
+
+# conduct actual test 
+binom.test(x = truth_correct, # variable created in earlier chunk
+           n = total_truth_guesses,
+           p = 0.5,
+           alternative = "two.sided",
+           conf.level = 0.95)
+```
+
+```{r binom_npv}
+
+# conduct actual test 
+binom.test(x = lie_correct, # variable created in earlier chunk
+           n = total_lie_guesses,
+           p = 0.5,
+           alternative = "two.sided",
+           conf.level = 0.95)
+```
+
+```{r chi_square_prec_v_npv}
+prop.test(x = c(truth_correct, lie_correct),
+          n = c(total_truth_guesses, total_lie_guesses),
+          alternative = "two.sided",
+          conf.level = 0.95)
+```
 
 # Save
 
-```{r, eval=FALSE}
+With this, we are done with the primary analysis of human truth-lie detection
+performance. I will save the main results and data files we have created.
+
+```{r save_main_stuff, eval=FALSE}
 # saved bound together human guesses
 save(stats_guess,
      file = "stats_guess.Rda")
@@ -264,23 +458,36 @@ save(results_human,
 
 # OTHER ANALYSES
 
+In this section, I would just like to cursorily breeze through some non-primary
+analyses, which I'm nevertheless wondering about. I won't do formal tests for 
+statistical inference. Rather, I just want to quickly visually inspect a few
+things for any obvious patterns.
+
 ## Performance by Person
+
+First, I want to just quickly get a sense of how performance various by person.
+To this, I will examine the five main performance measures (overall accuracy,
+sensitivity, specificity, precision, and negative predictive value) for each
+of the three research assistants.
 
 ### Performance by Person (Store Results)
 
-```{r}
+Below, I compute and store the performance results for each of research
+assistants.
+
+```{r perf_by_person_df}
 # -----------------------------------------------------------------------------
 # STEP 1: create vector of names of guessers
-people <- c("lexi", "emem")
+people <- c("lexi", "emem", "catherine")
 
 # -----------------------------------------------------------------------------
 # STEP 2: initialize data frame to save results
 human_perf <-
-  matrix(ncol = 8,
+  matrix(ncol = 6,
          nrow = length(people))
 # name columns
-colnames(human_perf) <- c("person", "accuracy", "accuracy_lower", "accuracy_upper",
-                          "sensitivity", "specificity", "precision", "npv")
+colnames(human_perf) <- c("person", "accuracy", "sensitivity", "specificity", "precision", "npv")
+
 # convert to df
 human_perf <- data.frame(human_perf)
 
@@ -303,10 +510,10 @@ for (person_i in people) {
   human_perf[counter, 1] <- person_i
   
   # store overall accuracy stats
-  human_perf[counter, 2:4] <- c(conf_i$overall[1], conf_i$overall[3], conf_i$overall[4])
+  human_perf[counter, 2] <- conf_i$overall[1]
   
   # store sensitivity, specificity, precision, NPV
-  human_perf[counter, 5:8] <-  c(conf_i$byClass[1], conf_i$byClass[2],
+  human_perf[counter, 3:6] <-  c(conf_i$byClass[1], conf_i$byClass[2],
                          conf_i$byClass[3], conf_i$byClass[4])
 }
 
@@ -314,18 +521,42 @@ for (person_i in people) {
 
 ### Performance by Person (Results)
 
-```{r}
+Below, the resultant data object -- with each of the five major performance
+statistics for each research assistant -- is printed. It's hard to compare
+and gain insight from the raw numbers (at least for me), so let's instead
+visualize this.
+
+```{r perf_by_person_raw}
 human_perf
 ```
 
 ### Peformance by Person (Visualize)
 
-```{r, fig.width=8, fig.height=7}
+From quick visual inspection, my main takeaway is that overall accuracy is pretty
+similar across people. But sensitivity and specificity vary widely. One RA (Lexi)
+has a wide gap between her ability to correctly identify truths as truths (>80%)
+and her ability to correctly identify lies as lies (<30%). This likely comes from
+making way more guesses of truths that lies. Meanwhile other RAs (e.g. Catherine)
+are more well balanced in their ability to identify truths as truths (~57%)
+and lies as lies (~52%). It is interesting that these wide differences in guessing
+patterns lead to similar overall performance. It is also interesting to speculate
+as to what might be the source of these differences. Are people with higher sensitivity
+scores more trusting (and as a result trust that more statements are true),
+and people with higher specificity scores more skeptical and suspicious (and as
+a result are more likely to believe that a statement might be a lie)? Are people
+with closer sensitivity and specificity scores (assuming some baseline level of
+performance; i.e. not just that both are very low) in some sense more "discerning"?
+Are these differences stable? Are they due the communicative environments in which
+people are immersed, or individual talents? It might be worth examining any of these
+questions more closely, as well as combing the existing literature for insights.
+
+```{r viz_perf_by_person, fig.width=8, fig.height=7}
 human_perf %>%
   gather(key = "perf_stat",
          value = "result",
-         accuracy, accuracy_lower, accuracy_upper,
-         sensitivity, specificity, precision, npv) %>%
+         accuracy, sensitivity, specificity, precision, npv) %>%
+  mutate(perf_stat = factor(perf_stat,
+                            levels = c("accuracy", "sensitivity", "specificity", "precision", "npv"))) %>%
   ggplot(aes(x = person,
              y = round(result * 100, 1),
              fill = person)) +
@@ -346,54 +577,26 @@ human_perf %>%
         panel.grid.minor.x = element_blank())
 ```
 
-### Performance by Order by Person
+## Confidence Calibration
 
-```{r, fig.width=8, fig.height=6}
-# calculat results by order
-human_perf_order <-
-  stats_guess %>%
-  mutate(order_tens = floor(order / 10)) %>%
-  mutate(outcome = case_when((predict == "truth") & (grd_truth == "truth") ~ "true_pos",
-                             (predict == "truth") & (grd_truth == "lie") ~ "false_pos",
-                             (predict == "lie") & (grd_truth == "lie") ~ "true_neg",
-                             (predict == "lie") & (grd_truth == "truth") ~ "false_neg")) %>%
-  group_by(person, order_tens, outcome) %>%
-  dplyr::summarise(n = n()) %>%
-  spread(key = outcome,
-         value = n,
-         fill = 0) %>%
-  mutate(accuracy = (true_pos + true_neg) / (true_pos + true_neg + false_pos + false_neg),
-         sensitivity = (true_pos) / (true_pos + false_neg),
-         specificity = (true_neg) / (true_neg + false_pos),
-         precision = (true_pos) / (true_pos + false_pos),
-         npv = (true_neg) / (true_neg + false_neg)) %>%
-  gather(key = "perf_stat",
-         value = "result",
-         accuracy, sensitivity, specificity, precision, npv)
+Another relationship I wanted to briefly examine in the data is the one
+between accuracy and confidence. Because each guess was accompanied by a confidence
+rating, it is possible to examine whether greater confidence in a guess actually
+translated into greater accuracy.
 
-# graph results
-human_perf_order %>%
-  filter((person == "lexi") | (person == "emem"),
-         perf_stat == "accuracy") %>%
-  ggplot(aes(x = order_tens,
-             y = round(result * 100, 1),
-             color = person)) +
-  geom_line() +
-  geom_smooth(method = "loess") +
-  scale_y_continuous(breaks = seq(from = 0, to = 100, by = 5)) +
-  scale_x_continuous(breaks = seq(from = 0, to = max(human_perf_order$order_tens), by = 5)) +
-  labs(title = "Accuracy over Time",
-       y = "Accuracy",
-       x = "Order of Completion (Groups of Tens)") +
-  theme(plot.title = element_text(hjust = 0.5),
-        legend.position = "top")
-```
+### Confidence Calibration (Tabulate)
 
-# Confidence Calibration
+My goal is to examine how each of the five key performance metrics vary as a function
+of confidence. Here I will compute and store the necessary values to evaluate this.
+I will visualize these results in the next chunk, but the raw data is printed below.
+One observation we can make from this is that the distribution of confidence ratings
+was not uniform. The most common level of confidence was either "3 = Fairly confident"
+(952 total in this category) or "2 = Somewhat confident" (856 total); least common 
+was "5 = Very confident" (536 total), with the other possibilities -- "1 = Slightly 
+confident" (674 total) and "0 = Not at all confident" (626) -- falling somewhat inbetween,
+although closer to the lower end.
 
-## Confidence Calibration (Tabulate)
-
-```{r}
+```{r conf_df}
 # count number of TP, TN, FP, FN
 stats_guess_keyed <-
   stats_guess %>%
@@ -427,16 +630,33 @@ human_perf_conf
 
 ## Confidence Calibration (Visualize)
 
-```{r}
+I've visualized the results below. Along the x-axis are the confidence ratings.
+A separate line is drawn (in different colors) for each of the five performance
+statistics. Along the y-axis runs percentage. Just from this superficial look,
+there is some hint of a positive relationship between confidence ratings and 
+performance, whereby performance (as measured by overall accuracy, sensitivity,
+precision, and negative predictive values) seems to be higher when people
+have higher confidence in their guesses. Although, this pattern seems notably
+different for specificity; that is, accuracy in correctly identifying lies as lies.
+If the data are to be believed, specificity is actually highest when participants
+are least confident in their guesses. Meanwhile, sensitivity is lowest when
+participants are least confident. This might suggest that when participants are least
+confident in their guesses, they could improve their accuracy by erring more towards
+guessing that a statement is a lie. Deeper and further analysis is needed to 
+examine these relationships.
+
+```{r conf_viz}
 human_perf_conf %>%
   gather(key = "perf_stat",
          value = "result",
          accuracy, sensitivity, specificity, precision, npv) %>%
+  mutate(perf_stat = factor(perf_stat,
+                            levels = c("accuracy", "sensitivity", "specificity", "precision", "npv"))) %>%
   ggplot(aes(x = conf,
              y = round(result * 100, 1),
              color = perf_stat)) +
-  geom_point(aes(size = perc_pos)) +
   geom_line() +
+  # geom_point(aes(size = total)) +
   geom_hline(yintercept = 50,
              color = "black",
              linetype = "dotted",
@@ -444,9 +664,169 @@ human_perf_conf %>%
   scale_y_continuous(breaks = seq(from = 0, to = 100, by = 5)) +
   labs(title = "Performance by Confidence Level",
        x = "Confidence Level",
-       y = "%") +
+       y = "%",
+       color = "Performance \n Measure") +
   theme(plot.title = element_text(hjust = 0.5))
 ```
 
+## Performance by Order
+
+Finally, although guessers did not receive feedback as they went along, I wanted
+to quickly visually examine whether people might have gotten better as they
+were going along. For each participant, I not only have their judgments for each 
+statement, but the order in which they went through the statements. Thus, I can
+examine how performance varies as a function of how many statments participants
+had already rated. This is what I do below, in multiple ways.
+
+(Note; for this analysis I added back in the 100 overlapping statements that
+both Emem and Catherine rated; as excluding them would alter the apparent order
+in which people responded to statements. This would be an especially
+notable exclusion here because, for both Emem and Catherine, these 100 statements
+were the very first 100 statements they evaluated. This is what I am doing in the
+code chunk just below.)
+
+```{r make_full_dataset}
+# combine files again (with no later elimination of overlapping guesses)
+stats_guess_full <-
+  bind_rows(stats_emem_clean,
+            stats_catherine_clean,
+            stats_lexi_clean) %>%
+  left_join(y = (stats_clean %>% select(stat_id, grd_truth)),
+            by = "stat_id")
+  
+```
+
+### Performance by Order (Groups of Ten)
+
+Overall accuracy is either 0 or 100% when evaluating just one statement. Thus,
+it made sense to me to chunk the ordered statements together into equal sized
+groups. Of course, the size of these groups is arbitrary. I tried out
+two levels of granularity. Here statements are grouped into chunks of ten,
+i.e. we examining overall accuracy in the first chunk of 10 statements, followed by
+overall accuracy in the second chunk of 10 statements, and so on). This grouping
+size may be too granular, as the main thing that sticks out in the figure below is
+simply the high degree of variability as participants are going along, rather than
+any consistent improvement (or decrease) in performance over time.
+
+(Note the results end at different points along the x-axis for different research 
+assistants because each research assistant did not rate the same number of total
+statements.)
+
+```{r order_10, fig.width=10, fig.height=6}
+# calculat results by order
+human_perf_order <-
+  stats_guess_full %>%
+  mutate(order_tens = floor((order-1) / 10)) %>%
+  mutate(outcome = case_when((predict == "truth") & (grd_truth == "truth") ~ "true_pos",
+                             (predict == "truth") & (grd_truth == "lie") ~ "false_pos",
+                             (predict == "lie") & (grd_truth == "lie") ~ "true_neg",
+                             (predict == "lie") & (grd_truth == "truth") ~ "false_neg")) %>%
+  group_by(person, order_tens, outcome) %>%
+  dplyr::summarise(n = n()) %>%
+  spread(key = outcome,
+         value = n,
+         fill = 0) %>%
+  mutate(accuracy = (true_pos + true_neg) / (true_pos + true_neg + false_pos + false_neg),
+         sensitivity = (true_pos) / (true_pos + false_neg),
+         specificity = (true_neg) / (true_neg + false_pos),
+         precision = (true_pos) / (true_pos + false_pos),
+         npv = (true_neg) / (true_neg + false_neg),
+         total = true_pos + true_neg + false_pos + false_neg) %>%
+  filter(total == 10) %>%
+  gather(key = "perf_stat",
+         value = "result",
+         accuracy, sensitivity, specificity, precision, npv)
+
+# graph results
+human_perf_order %>%
+  filter(perf_stat == "accuracy") %>%
+  ggplot(aes(x = order_tens,
+             y = round(result * 100, 1),
+             color = person)) +
+  geom_line() +
+  geom_point() +
+  # geom_smooth(method = "loess") +
+  scale_y_continuous(breaks = seq(from = 0, to = 100, by = 5),
+                     limits = c(0, 100)) +
+  scale_x_continuous(breaks = seq(from = 0, to = max(human_perf_order$order_tens), by = 5)) +
+  labs(title = "Accuracy over Time",
+       y = "Accuracy",
+       x = "Order of Completion (Sequential Groups of Ten)") +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.text.x = element_text(angle = 90),
+        legend.position = "top")
+```
+
+### Performance by Order (Groups of One Hundred)
+
+The same results as above are visualized, except ordered statements have been
+chunked into groups of hundreds (i.e. along the x-axis is the first group of
+hundred statements, followed by the second group of one hundred statements, etc).
+Nothing extremely obvious or consistent pops out to me in this figure.
+There is no obvious trend in accuracy over "time", with performance seeming to
+improve just as often as it declines between rounds.
+
+(Note, that both here and in the visualization above, the final chunk graphed for
+each participant is the "last full chunk". e.g. If a participant rated say 805
+statements, we will see their performance across their first eight chunks of
+one hundred statements. We do not create a chunk for statements 800-805. The last
+"full chunk" is the eigth one consisting statements 700-799. (Note that chunk
+counting works like centuries; like the 8th century cover the years 700-799,
+the 8th chunk covers the statements #700-799; this is because the "first" chunk
+includes statements 0 to 99.))
+
+
+```{r order_100, fig.width=10, fig.height=6}
+# calculat results by order
+human_perf_order <-
+  stats_guess_full %>%
+  mutate(order_hundred = floor((order-1) / 100)) %>%
+  mutate(outcome = case_when((predict == "truth") & (grd_truth == "truth") ~ "true_pos",
+                             (predict == "truth") & (grd_truth == "lie") ~ "false_pos",
+                             (predict == "lie") & (grd_truth == "lie") ~ "true_neg",
+                             (predict == "lie") & (grd_truth == "truth") ~ "false_neg")) %>%
+  group_by(person, order_hundred, outcome) %>%
+  dplyr::summarise(n = n()) %>%
+  spread(key = outcome,
+         value = n,
+         fill = 0) %>%
+  mutate(accuracy = (true_pos + true_neg) / (true_pos + true_neg + false_pos + false_neg),
+         sensitivity = (true_pos) / (true_pos + false_neg),
+         specificity = (true_neg) / (true_neg + false_pos),
+         precision = (true_pos) / (true_pos + false_pos),
+         npv = (true_neg) / (true_neg + false_neg),
+         total = true_pos + true_neg + false_pos + false_neg) %>%
+  filter(total == 100) %>%
+  gather(key = "perf_stat",
+         value = "result",
+         accuracy, sensitivity, specificity, precision, npv)
+
+# graph results
+human_perf_order %>%
+  filter(perf_stat == "accuracy") %>%
+  ggplot(aes(x = order_hundred,
+             y = round(result * 100, 1),
+             color = person)) +
+  geom_line() +
+  geom_point() +
+  # geom_smooth(method = "loess") +
+  scale_y_continuous(breaks = seq(from = 0, to = 100, by = 5),
+                     limits = c(0, 100)) +
+  scale_x_continuous(breaks = seq(from = 0, to = max(human_perf_order$order_hundred), by = 1)) +
+  labs(title = "Accuracy over Time",
+       y = "Accuracy",
+       x = "Order of Completion (Sequential Groups of One Hundred)") +
+  theme(plot.title = element_text(hjust = 0.5),
+        legend.position = "top")
+```
+
+# Citations
+
+* Bond Jr, C. F., & DePaulo, B. M. (2006). Accuracy of deception judgments.
+Personality and social psychology Review, 10(3), 214-234.
+
+* Levine, T. R., Park, H. S., & McCornack, S. A. (1999). Accuracy in detecting
+truths and lies: Documenting the "veracity effect." Communications Monographs,
+66(2), 125-144.
 
 # END
