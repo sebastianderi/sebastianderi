@@ -192,22 +192,13 @@ $(document).ready(function () {
 </div>
 
 
-<div id="overview" class="section level1">
-<h1>Overview</h1>
-<p>Communication is a core element of human interaction. And those communicating often have to judge whether what they are being told is true. This task can be called “lie detection” (or truth detection, if you prefer). An interesting question is how good people are at lie detection, and how they might do better.</p>
-<p>To that end, in this report, I compare human lie detection with various alternatives. More specifically, I compare (1) human lie detection accuracy to the accuracy that can be achieved by (2) computer models, and (3) and “hybrid” human-computer models (that incorporate both human judgement and computationally derived information).</p>
-<p>In the “real world”, communication typically occurs via face-to-face conversations wherein a great deal of information is available in addition to the literal communicated statements themselves: facial expressions, the tone and pitch of a person’s voice and so on. While all of these may provide cues as to the truth or falsity of a statement, the truth value to be judged is ultimately in these statements themselves – which can be captured strictly as text, i.e. written sentences. In this report, I focus on lie detection of this variety – truth-lie judgments of written statements. Partly, this is a matter of convenience (as this type of data is easier to collect) and partly it is a matter of trying to keep things simple.</p>
-<p>Human, computer, and hybrid human-computer performance will be evaluated on a specific data set of written statements that I have collected. A bulk of the work will be in extracting useful textual features from these statements and then constructing statistical models that can use these features to make truth-lie predictions.</p>
-<p>My focus here is on performance. I want to know which type of decision making agent achieves the highest levels of lie detection accuracy – humans, computers, or hybrid human-computer models. I believe that the best performance can be achieved by hybrid human-computer models. I expect this result because I expect following three conditions to hold: (1) humans will perform better than chance, (2) computer models will perform better than chance, (3) the bases of human judgments and computer judgments will differ. While there is debate about human lie detection accuracy and how exactly to measure it (Vrij &amp; Granhag, 2012), there is credible research which suggests that humans’ overall accuracy rate in truth-lie detection is better than chance (e.g. Bond &amp; DePaulo, 2006 find an overall accuracy rate of 54% in an analysis of 24,483 judgments from 206 papers; see also: ten Brinke, Vohs, &amp; Carney, 2016). Likewise, others have built computer models that are able to perform significantly better than chance at truth-lie detection (e.g. Mihalcea &amp; Strapparava, 2009; Newman, Pennebaker, Berry, &amp; Richards, 2003). Finally, it is certain that human and computer judgments are formed on different bases. Previous computer models have been trained on very rudimentary textual features which can be extracted from the words in a sentence (e.g. sentiment and parts of speech), as our model will be. In contrast, humans do not primarily attend to things like the number of adverbs in a sentence when making truth-lie judgments. They are likely attend to a host of factors when making truth-lie judgments that computer models, as yet, cannot and do not incorporate – notably, they can contrast the claims put forth in statements with their general knowledge of the world and personal experiences (e.g. “why would a person in that situation do that? this seems like a lie”).</p>
-<p>For these reasons, I suspect that hybrid human-computer models will be outperform both humans alone and computers alone. To my knowledge, this has not been demonstrated before.</p>
-</div>
 <div id="sections" class="section level1">
 <h1>Sections</h1>
 <p>This report is broken down into the following major sections, which build on each other sequentially.</p>
 <ul>
 <li><a href="./hld_DATAGEN.html">Data Generation</a></li>
 <li><a href="./hld_DATAOVERVIEW.html">Data Overview</a></li>
-<li>Computer Performance
+<li>Pure Computer Model Prediction
 <ul>
 <li><a href="./hld_FEATURE_overview.html">Feature Extraction</a>
 <ul>
@@ -227,9 +218,8 @@ $(document).ready(function () {
 <li><a href="./hld_MODEL_comparison.html">Comparison of All Models</a></li>
 </ul></li>
 </ul></li>
-<li><a href="./hld_HUMAN_perf.html">Human Performance</a></li>
-<li><a href="./hld_HUMAN_MODEL_comparison.html">Comparison of Human and Computer Performance</a></li>
-<li><a href="./hld_HMODEL_overview.html">Hybrid Performance</a>
+<li><a href="./hld_HUMAN_perf.html">Pure Human Prediction</a></li>
+<li><a href="./hld_HMODEL_overview.html">Hybrid Human-Computer Model Prediction</a>
 <ul>
 <li><a href="./hld_HMODEL_logistic.html">Logistic Regression Hybrid Model</a></li>
 <li><a href="./hld_HMODEL_svm.html">Support Vector Machine Hybrid Model</a></li>
@@ -237,6 +227,15 @@ $(document).ready(function () {
 <li><a href="./hld_HMODEL_comparison.html">Comparison of All Hybrid Models</a></li>
 </ul></li>
 </ul>
+</div>
+<div id="overview" class="section level1">
+<h1>Overview</h1>
+<p>Communication is a core element of human interaction. And those communicating often have to judge whether what they are being told is true. This task can be called “lie detection” (or truth detection, if you prefer). An interesting question is how good people are at lie detection, and how they might do better.</p>
+<p>To that end, in this report, I compare human lie detection with various alternatives. More specifically, I compare (1) human lie detection accuracy to the accuracy that can be achieved by (2) computer models, and (3) and “hybrid” human-computer models (that incorporate both human judgement and computationally derived information).</p>
+<p>In the “real world”, communication typically occurs via face-to-face conversations wherein a great deal of information is available in addition to the literal communicated statements themselves: facial expressions, the tone and pitch of a person’s voice and so on. While all of these may provide cues as to the truth or falsity of a statement, the truth value to be judged is ultimately in these statements themselves – which can be captured strictly as text, i.e. written sentences. In this report, I focus on lie detection of this variety – truth-lie judgments of written statements. Partly, this is a matter of convenience (as this type of data is easier to collect) and partly it is a matter of trying to keep things simple.</p>
+<p>Human, computer, and hybrid human-computer performance will be evaluated on a specific data set of written statements that I have collected. A bulk of the work will be in extracting useful textual features from these statements and then constructing statistical models that can use these features to make truth-lie predictions.</p>
+<p>My focus here is on performance. I want to know which type of decision making agent achieves the highest levels of lie detection accuracy – humans, computers, or hybrid human-computer models. I believe that the best performance can be achieved by hybrid human-computer models. I expect this result because I expect the following three conditions to hold: (1) humans will perform better than chance, (2) computer models will perform better than chance, (3) the bases of human judgments and computer judgments will differ. While there is debate about human lie detection accuracy and how exactly to measure it (Vrij &amp; Granhag, 2012), there is credible research which suggests that humans’ overall accuracy rate in truth-lie detection is better than chance (e.g. Bond &amp; DePaulo, 2006 find an overall accuracy rate of 54% in an analysis of 24,483 judgments from 206 papers; see also: ten Brinke, Vohs, &amp; Carney, 2016). Likewise, others have built computer models that are able to perform significantly better than chance at truth-lie detection (e.g. Mihalcea &amp; Strapparava, 2009; Newman, Pennebaker, Berry, &amp; Richards, 2003). Finally, it is certain that human and computer judgments are formed on different bases. Previous computer models have been trained on very rudimentary textual features which can be extracted from the words in a sentence (e.g. sentiment and parts of speech), as our model will be. In contrast, humans do not primarily attend to things like the number of adverbs in a sentence when making truth-lie judgments. They are likely attend to a host of factors when making truth-lie judgments that computer models, as yet, cannot and do not incorporate – notably, they can contrast the claims put forth in statements with their general knowledge of the world and personal experiences (e.g. “why would a person in that situation do that? this seems like a lie”).</p>
+<p>For these reasons, I suspect that hybrid human-computer models will be outperform both humans alone and computers alone. To my knowledge, this has not been demonstrated before.</p>
 </div>
 <div id="format" class="section level1">
 <h1>Format</h1>
