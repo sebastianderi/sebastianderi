@@ -9,6 +9,15 @@ output:
 
 [return to [overview page](./hld_OVERVIEW.html)]
 
+In this section, we will generate our first hybrid human-computer model.
+This will be a logistic regression model. The general training-testing and
+model building procedure will be exactly the same as for our earlier
+(logistic regression model)[(./hld_MODEL_logistic.html)], with the exception
+of course that our hybrid model will also take into account human predictions
+as a feature (in addition to the textual features used earlier). The performance
+of this model will be compared to the performance of a non-hybrid model (which uses
+only textual features) trained on the same statements.
+
 # Packages
 
 Again, I will start by loading relevant packages.
@@ -22,11 +31,9 @@ library(caret) # modeling
 
 # Load Data
 
-Next, I will load the pre-processed data, which we created earlier
-(see [Data Cleaning & Pre-Processing](./hld_CLEAN.html)). This dataset has
-a row for each of 5,004 statements, a column indicating whether that particular
-statement was a truth or a lie, and 90 possible predictor variables for 
-each statement, which comes from the textual features we extracted earlier.
+Next, I will load the data file, we created [earlier](./hld_HMODEL_overview.html),
+which has both the cleaned and processed textual features and human predictions.
+Note, again, that these data files consists of a total of 3,663 statments.
 
 ```{r}
 # load df of combined human and processed textual feature and ground truth
@@ -37,18 +44,24 @@ load("stats_combo.Rda")
 
 # EXAMPLE (Single Predictive Logistic Regression Model)
 
-As usual, let's begin with an example. Here we will simply train and test
-one single logistic regression model.
+As usual, let's begin with a singular example. Here we will simply train and test
+two logistic regression models: one hybrid model that takes into accounts
+both human predictions and textual features and one that only takes into
+account textual features. 
 
 ## Split Sample Into Training and Testing Sets
 
-Our first step will be to split the entire dataset into two parts -- our training
-data set, on which the model will be build, and our testing data set, on which
-the performance of our model will be evaluated. Although many possible splits would be
-acceptable (e.g. 75-25, 90-10), we are going to conduct an exact 50-50 split,
+As before, we are going to conduct an exact 50-50 split,
 randomly allocating one half of the statements to the training set, and
-the other half to the testing set. The createDataPartition function in the 
-caret packages makes this easy (Kuhn, 2008).
+the other half to the testing set (using the createDataPartition function in the 
+caret packages; Kuhn, 2008; Kuhn, 2019). The exact same training set will be
+used to build the hybrid and non-hybrid models, both of which will then also be tested
+on the exact same testing set. (By "exactly the same", I mean the statements
+in the training set for the hybrid model will be exactly the same as the statements
+in the training set for the non-hybrid model. And the statements in the testing
+set for the hybrid model will be exactly the same as the statements in the
+testing set for the non-hybrid model. Of course, the features used in the two
+models will differ, in the way stated above.)
 
 ```{r, cache = FALSE}
 # set seed, so that statistics don't keep changing for every analysis
@@ -71,13 +84,11 @@ test_set_ex <- stats_combo[-index_train_ex, ]
 
 ## Build Model (on Training Set)
 
-Now that the data are split, we can fit a logistic regression model to the training
-data. Again, the caret package makes this easy with its "train" function (Kuhn, 2008),
-which allows us to select from over 238 different model type (Kuhn, 2019; see:
-[Chapter 7](https://topepo.github.io/caret/train-models-by-tag.html), including
-of course the logistic regression model from the family of general lineal models.
-A single logistic regression model is fitted below.
-
+Now that the data are split, we can fit the logistic regression models to the training
+data. Again, we will fit two logistic regression models. One, a hybrid model that uses
+both textual features and human guesses as predictors. An the other, a non-hybrid
+model that uses on textual features as predictors. These two models are fit to the
+training data below.
 
 ```{r, cache = FALSE}
 # set seed, so that statistics don't keep changing for every analysis
@@ -88,8 +99,14 @@ set.seed(2019)
 start_time <- Sys.time()
 
 # use caret "train" function to train logistic regression model
-model_ex <- 
+model_hybrid <- 
   train(form = grd_truth ~ . - stat_id,
+        data = train_set_ex,
+        method = "glm",
+        family = "binomial")
+
+model_non_hybrid <-
+  train(form = grd_truth ~ . -stat_id -predict,
         data = train_set_ex,
         method = "glm",
         family = "binomial")
@@ -101,55 +118,245 @@ total_time <- Sys.time() - start_time
 
 ## Evaluate Model (on Testing Set)
 
-Finally, let's see if our model is any good. To do this, we will use it to make
-predictions about the remaining 2,504 statments in the test set, which we set aside earlier.
-This is done below. The confusionMatrix function from the caret package provides an
-easy way to collect some basic statistics on how our model performed. As we can see
-from the text output of this function, our model did pretty well (Kuhn, 2008). 
-Its overall accuracy was 
-significantly better than chance: 60.7% [95% CI: 58.8, 62.6%]. And it performed
-well both in identifying truths (i.e. sensitivity: 58.2%) and identifying lies
-(i.e. specificity: 63.3%). When it made a prediction that a statement was a truth,
-it was correct more often than not (i.e. precision or positive predictive value:
-61.3%). And when it made a prediction that a statement was a lie, it was also
-correct more often than not (i.e. negative predictive value: 60.2%). (Confidence
-intervals can easily be generated for these other four statistics as well (i.e. +/-
-z\*(sqrt(p\*(1-p)/n), where z = 1.96 under the normal approximation method
-for calculating binomial proportion confidence intervals (Binomial proportion 
-confidence interval, 2019); I won't calculate these for this example, but I will 
-do so below in our full analysis.)
+Finally, let's examine and compare the performance of the two models. As before,
+this is done by using the models to generate predictions on the remaining ~50%
+of the data (1831 statements) in the training set. And then examining the performance
+statistics using the confusionMatrix function from the caret package (Kuhn, 2008).
+
+Both models have an overall accuracy level that is above chance:
+
+* hybrid model: 64.1% [95% CI: 61.9, 66.3%]
+* non-hybrid model: 63.2% [95% CI: 60.9, 65.4%]
+
+And the overall accuracy of the hybrid model is better than the overall accuracy
+of the non-hybrid model. Dissapointingly, however, this difference is not 
+significant, chi-squared = 0.30, p = 0.583. Not even close in fact. This is both
+dissapointing and surprising. [Earlier](./hld_HUMAN_perf.html), we saw that human 
+predictions alone achieved an accuracy of over 55%, which was well above chance.
+And a model trained only on textual features here does well above chance as well
+(overall accuracy > 63%, as seen just above). It would stand to reason that adding
+in human predictions would serve to significantly improve the model. This is of
+course not what happened. I will need to conduct further analyses to examine why this
+is. One possible hypothesis at the moment is that (1) human predictions are 
+somehow redundant with some existing feature or set of features. (Note: this is not to
+say that such a feature or set of features is the actual basis of human judgments,
+just that there might be, for whatever reason, an assocation). However, a priori,
+this seems unlikely to me, knowing the features we have extracted (i.e. it seems
+unlikely to me that human judgments are going to track something as clinical as
+the number of pronouns in a sentence, or even more "human" features like sentiment).
+Another hypothesis relates to (2) the different pattern of guessing by which
+humans and computer models achieve their accuracy. As we saw in our previous 
+analyses, computer models had roughly comparable levels of sensitivity (rate of 
+truth detection) and specificity (rate of lie detection). However, humans had
+much higher sensitivity than specificity. I am not sure of the exact effect of
+this on the hybrid models, but a loose speculation might be that any gains in
+accuracy that might come from adding in human predictions would come from
+correctly identifying a larger portion of truths as truths, however, these would
+be "offset" by increasing the portion of lies that are incorrectly identified.
+
+With regard to other performance metrics, I have not yet conducted formal statistical
+for each of theme, but sensitivity, specificity, precision, and negative predictive
+value look roughly the same between the hybrid and non-hyrbid models.
 
 ```{r, cache = FALSE}
-# make predictions
-preds_ex <-
-  predict(object = model_ex,
+# generate predictions for hybrid model 
+preds_hybrid <-
+  predict(object = model_hybrid,
           newdata = test_set_ex,
           type = "raw")
-      
-# record model performance
-conf_ex <-
-  confusionMatrix(data = preds_ex,
-                  reference = test_set_ex$grd_truth,
-                  positive = "truth")
-      
-# print confusion matrix
-conf_ex
+
+# generate predictions for non-hybrid model
+preds_non_hybrid <-
+  predict(object = model_non_hybrid,
+          newdata = test_set_ex,
+          type = "raw")
 
 ```
 
+```{r}
+# examine hybrid model performance
+conf_hybrid <-
+  confusionMatrix(data = preds_hybrid,
+                  reference = test_set_ex$grd_truth,
+                  positive = "truth")
+
+# print
+conf_hybrid
+
+```
+
+```{r}
+# examine non-hybrid model performance
+conf_non_hybrid <-
+  confusionMatrix(data = preds_non_hybrid,
+                  reference = test_set_ex$grd_truth,
+                  positive = "truth")
+
+# print
+conf_non_hybrid
+
+```
+
+```{r}
+# calculate values relevant for test (and some extras, in case i want to compare sensitivity, etc)
+hybrid_truth_correct = conf_hybrid$table[4]
+hybrid_truth_total = conf_hybrid$table[3] + conf_hybrid$table[4]
+hybrid_lie_correct = conf_hybrid$table[1]
+hybrid_lie_total = conf_hybrid$table[1] + conf_hybrid$table[2]
+hybrid_total_correct = hybrid_truth_correct + hybrid_lie_correct
+hyrbid_total_truth_guesses = conf_hybrid$table[2] + conf_hybrid$table[4]
+hyrbid_total_lie_guesses = conf_hybrid$table[1] + conf_hybrid$table[3]
+hybrid_total = sum(conf_hybrid$table)
+
+non_hybrid_truth_correct = conf_non_hybrid$table[4]
+non_hybrid_truth_total = conf_non_hybrid$table[3] + conf_non_hybrid$table[4]
+non_hybrid_lie_correct = conf_non_hybrid$table[1]
+non_hybrid_lie_total = conf_non_hybrid$table[1] + conf_non_hybrid$table[2]
+non_hybrid_total_correct = non_hybrid_truth_correct + non_hybrid_lie_correct
+non_Hyrbid_total_truth_guesses = conf_non_hybrid$table[2] + conf_non_hybrid$table[4]
+non_hyrbid_total_lie_guesses = conf_non_hybrid$table[1] + conf_non_hybrid$table[3]
+non_hybrid_total = sum(conf_non_hybrid$table)
+
+```
+
+
+```{r}
+# conduct actual test
+prop.test(x = c(hybrid_total_correct, non_hybrid_total_correct),
+          n = c(hybrid_total, non_hybrid_total),
+          alternative = "two.sided",
+          conf.level = 0.95)
+```
+
+```{r}
+# examine z value, using two proportion z-test just for comparison
+
+# function to compute z-value
+# from: https://www.r-bloggers.com/comparison-of-two-proportions-parametric-z-test-and-non-parametric-chi-squared-methods/
+z.prop = function(x1,x2,n1,n2){
+  numerator = (x1/n1) - (x2/n2)
+  p.common = (x1+x2) / (n1+n2)
+  denominator = sqrt(p.common * (1-p.common) * (1/n1 + 1/n2))
+  z.prop.ris = numerator / denominator
+  return(z.prop.ris)
+}
+
+# actual z prop (z = 0.58)
+z_value <-
+  z.prop(x1 = hybrid_total_correct,
+         x2 = non_hybrid_total_correct,
+         n1 = hybrid_total, 
+         n2 = non_hybrid_total)
+
+# get corresponding p-value (two-sided) (p = 0.559)
+p_value <- 2*pnorm(-abs(z_value))
+
+# print z and p
+print(paste("z=", round(z_value, 3),
+            ", p=", round(p_value, 3),
+            sep = ""))
+```
+
+
+# Change in predictions
+
+Let's try to get some insight into how the incorporating human predictions
+changed the predictions made by the hybrid model (as compared to the predictions
+made by the non-hybrid model). As we have discussed [before](./hld_MODEL_overview.html),
+there are only four possibile outcomes when the predictions of a model are compared
+to reality: true positive, true negative, false positive, false negative.
+All of the model's performance depends on these four quantities. We can
+think of the non-hybrid model as a "baseline", upon which the hybrid model might
+improve. The only way the hybrid model might improve upon the non-hybrid model
+is through one of two ways: a statment that was incorrectly predicted as a false negative
+by the non-hybrid model is correctly predicted as a true positive by the hybrid model,
+or a statement that was incorrectly predicted as a false positive by the non-hybrid
+model is correctly predicted as a tur negative by the hybrid model. The rest of the 
+changes either have no effect (a true positive stays a true positive from the non-hybrid
+to a hybrid model, a true negative stays a true negative, a false positive stays a 
+false positive, or a false negative stays a false negative) or are detrimental 
+(a true positive becomes a false negative, or a true negative becomes a false
+positive).
+
+Below, I have tabulated the total number of times these eight possible changes
+have occurred, when the non-hybrid model's predictions are compared to the
+hybrid model's predictions. What we see is that most of the predictions stayed
+the same
+between the non-hybrid and hybrid model (1698 of 1831 predictions, 92.7%, were the
+same). And only a slightly higher number of predictions went from incorrect 
+to correct (75 cases, 4.1%, were either false negative that become true positives
+or false positives that become true negatives) than the number of predictions
+that went from correct to incorrect (58 cases, 3.2%, were either true positives
+that become false negatives or true negatives that became false positives).
+
+More detailed analyses should examine how the human predictions relate to the
+other features used for prediction.
+
+```{r}
+# combine: grd_truth, non_hybrid predictions, hybrd predictions
+preds_comp <-
+  cbind(as.data.frame(test_set_ex$grd_truth),
+        as.data.frame(preds_non_hybrid),
+        as.data.frame(preds_hybrid))
+
+# label columns
+colnames(preds_comp) <- c("grd_truth", "non_hyb", "hyb")
+
+# print
+# preds_comp
+
+# generate additional information
+preds_tally <-
+  preds_comp %>%
+  group_by(grd_truth, non_hyb, hyb) %>%
+  summarize(n = n()) %>%
+  arrange(desc(grd_truth), desc(non_hyb), desc(hyb)) %>%
+  mutate(change_present = case_when(non_hyb == hyb ~ "no",
+                            non_hyb != hyb ~ "yes")) %>%
+  mutate(change_type = case_when(grd_truth == "truth" & non_hyb == "truth" & hyb == "truth" ~ "TP -> TP",
+                            grd_truth == "truth" & non_hyb == "truth" & hyb == "lie" ~ "TP -> FN",
+                            grd_truth == "truth" & non_hyb == "lie" & hyb == "truth" ~ "FN -> TP",
+                            grd_truth == "truth" & non_hyb == "lie" & hyb == "lie" ~ "FN -> FN",
+                            grd_truth == "lie" & non_hyb == "truth" & hyb == "truth" ~ "FP -> FP",
+                            grd_truth == "lie" & non_hyb == "truth" & hyb == "lie" ~ "FP -> TN",
+                            grd_truth == "lie" & non_hyb == "lie" & hyb == "truth" ~ "TN -> FP",
+                            grd_truth == "lie" & non_hyb == "lie" & hyb == "lie" ~ "TN -> TN")) %>%
+  mutate(change_effect = case_when(change_type == "TP -> TP" ~ "nothing",
+                                   change_type == "TN -> TN" ~ "nothing",
+                                   change_type == "FP -> FP" ~ "nothing",
+                                   change_type == "FN -> FN" ~ "nothing",
+                                   change_type == "FN -> TP" ~ "gain",
+                                   change_type == "FP -> TN" ~ "gain",
+                                   change_type == "TP -> FN" ~ "loss",
+                                   change_type == "TN -> FP" ~ "loss")) %>%
+  arrange(change_effect)
+
+# print
+preds_tally
+
+```
+
+```{r}
+# tally the total number of times each type of "change_effect" occurred
+preds_tally %>%
+  group_by(change_effect) %>%
+  summarize(n = sum(n))
+
+```
+
+
 # FULL (Predictive Logistic Regression Models)
 
-Our full analysis will almost exactly replicate what we did in our example case
-above, except we will replicate the procedure ten times. Thus, we will build
-10 different logistic regression models using 10 different training sets and evaluate 
-them on their 10 different (corresponding) test sets.
+To get more reliable estimates of the performance of non-hybrid and hybrid models,
+let's repeat the exact model training and testing procedure from above 10 times,
+storing and aggregating the results.
 
 ## Run 10 models
 
 Below is the code that runs through this modeling process 10 different times and
 saves the result from each round.
 
-```{r, cache = FALSE}
+```{r, cache = TRUE}
 # # -----------------------------------------------------------------------------
 # STEP 0: set seed, so that statistics don't keep changing for every analysis
 set.seed(2019)
@@ -161,8 +368,9 @@ rounds <- 10
 # -----------------------------------------------------------------------------
 # STEP 2: set up object to store results
 # part a: create names of results to store
-result_cols <- c("model_type", "round", "accuracy", "accuracy_LL", "accuracy_UL",
-                 "sensitivity", "specificity", "precision", "npv", "n")
+result_cols <- c("model_type", "hyb_type", "round", "accuracy", "accuracy_LL", "accuracy_UL",
+                 "sensitivity", "specificity", "precision", "npv", "n",
+                 "total_truths", "total_lies", "total_truth_guesses", "total_lie_guesses")
 
 # part b: create matrix
 results <-
@@ -196,46 +404,88 @@ for (i in 1:rounds){
   test_set <- stats_combo[-index_train, ]
   
   
-  # part c: use caret "train" function to train logistic regression model
-  model <- 
-    train(form = grd_truth ~ . - stat_id,
-          data = train_set,
+  # part c: use caret "train" function to train hybrid and non-hybrid logistic regression model
+  model_hybrid_i <- 
+  train(form = grd_truth ~ . - stat_id,
+        data = train_set_ex,
+        method = "glm",
+        family = "binomial")
+
+  model_non_hybrid_i <-
+    train(form = grd_truth ~ . -stat_id -predict,
+          data = train_set_ex,
           method = "glm",
           family = "binomial")
   
-  # part d: make predictions
-  preds <-
-    predict(object = model,
+  
+  # part d: make predictions, using both hybrid and non-hybrid models
+  preds_hyb_i <-
+    predict(object = model_hybrid_i,
             newdata = test_set,
             type = "raw")
   
-  # part e: store model performance
-  conf_m <-
-    confusionMatrix(data = preds,
+  preds_non_hyb_i <-
+    predict(object = model_non_hybrid_i,
+            newdata = test_set,
+            type = "raw")
+  
+  # part e: store model performance of both hybrid and non-hybrid model
+  conf_hyb_i <-
+    confusionMatrix(data = preds_hyb_i,
                     reference = test_set$grd_truth,
                     positive = "truth")
   
-  # part f: store model results
+  conf_non_hyb_i <-
+    confusionMatrix(data = preds_non_hyb_i,
+                    reference = test_set$grd_truth,
+                    positive = "truth")
+  
+  # part f: store hybrid and non-hybrod model results
   # model type
-  results[i, 1] <- "logistic"
+  results[2*i-1, 1] <- "logistic"
+  results[2*i, 1] <- "logistic"
+  # hybrid o non-hybrid
+  results[2*i-1, 2] <- "hybrid"
+  results[2*i, 2] <- "non_hybrid"
   # round
-  results[i, 2] <- i
+  results[2*i-1, 3] <- i
+  results[2*i, 3] <- i
   # accuracy
-  results[i, 3] <- conf_m$overall[1]
+  results[2*i-1, 4] <- conf_hyb_i$overall[1]
+  results[2*i, 4] <- conf_non_hyb_i$overall[1]
   # accuracy LL
-  results[i, 4] <- conf_m$overall[3]
+  results[2*i-1, 5] <- conf_hyb_i$overall[3]
+   results[2*i, 5] <- conf_non_hyb_i$overall[3]
   # accuracy UL
-  results[i, 5] <- conf_m$overall[4]
+  results[2*i-1, 6] <- conf_hyb_i$overall[4]
+  results[2*i, 6] <- conf_non_hyb_i$overall[4]
   # sensitivity
-  results[i, 6] <- conf_m$byClass[1]
+  results[2*i-1, 7] <- conf_hyb_i$byClass[1]
+  results[2*i, 7] <- conf_non_hyb_i$byClass[1]
   # specificity
-  results[i, 7] <- conf_m$byClass[2]
+  results[2*i-1, 8] <- conf_hyb_i$byClass[2]
+  results[2*i, 8] <- conf_non_hyb_i$byClass[2]
   # precision
-  results[i, 8] <- conf_m$byClass[3]
+  results[2*i-1, 9] <- conf_hyb_i$byClass[3]
+  results[2*i, 9] <- conf_non_hyb_i$byClass[3]
   # negative predictive value
-  results[i, 9] <- conf_m$byClass[4]
-  # sample size (of test set)
-  results[i, 10] <- sum(conf_m$table)
+  results[2*i-1, 10] <- conf_hyb_i$byClass[4]
+  results[2*i, 10] <- conf_non_hyb_i$byClass[4]
+  # sample size (total)
+  results[2*i-1, 11] <- sum(conf_hyb_i$table)
+  results[2*i, 11] <- sum(conf_non_hyb_i$table)
+  # total truths
+  results[2*i-1, 12] <- conf_hyb_i$table[3] + conf_hyb_i$table[4]
+  results[2*i, 12] <- conf_non_hyb_i$table[3] + conf_hyb_i$table[4]
+  # total lies
+  results[2*i-1, 13] <- conf_hyb_i$table[1] + conf_hyb_i$table[2]
+  results[2*i, 13] <- conf_non_hyb_i$table[1] + conf_non_hyb_i$table[2]
+  # total truth guesses
+  results[2*i-1, 14] <- conf_hyb_i$table[2] + conf_hyb_i$table[4]
+  results[2*i, 14] <- conf_non_hyb_i$table[2] + conf_non_hyb_i$table[4]
+  # total lie guesses
+  results[2*i-1, 15] <- conf_hyb_i$table[1] + conf_hyb_i$table[3]
+  results[2*i, 15] <- conf_non_hyb_i$table[1] + conf_non_hyb_i$table[3]
   
   # part g: print round and total elapsed time so far
   cumul_time <- difftime(Sys.time(), start_time, units = "mins")
@@ -347,5 +597,14 @@ rm(results)
 save(results_HYB_log,
      file = "results_HYB_log.Rda")
 ```
+
+
+# Citations
+
+* Kuhn, M. (2008). Building predictive models in R using the caret package. 
+Journal of Statistical Software, 28(5), 1-26.
+
+* Kuhn, M. (2019). The caret Package. Retrieved from https://topepo.github.io/caret/index.html
+
 
 # END
