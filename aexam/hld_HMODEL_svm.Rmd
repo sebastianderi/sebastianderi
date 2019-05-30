@@ -9,144 +9,117 @@ output:
 
 [return to [overview page](./hld_OVERVIEW.html)]
 
-In this section, I will build a support vector machine (SVM) model to make
-truth and lie predictions on our statements. I turn to this technique because 
-it is one of the popular modeling methods in "machine learning". Kuhn & Johnson (2013, p.343) 
-state that SVMs have become "one of the most flexible and effective 
-machine learning tools available" since they were first developed by Vladimir Vapnik
-in the 1960s. Indeed, SVMs are used in countless research papers in the realm of
-computational social science and text analysis (e.g. Bakshy, Messing, & Adamic 
-(2015) use an SVM for news article classification in their highly cited paper 
-on selective news exposure on Facebook, and Wu et al. (2008) list it in their 
-article "Top 10 algorithms in data mining", a paper which itself has over 3,900 citations).
-
+In this section, we will generate our second hybrid human-computer model.
+This will be a support vector machine model. The general training-testing and
+model building procedure will be exactly the same as for our earlier
+[support vector machine model](./hld_MODEL_logistic.html), with the exception
+of course that our hybrid model will also take into account human predictions
+as a feature (in addition to the textual features used earlier). The performance
+of this model will be compared to the performance of a non-hybrid model (which uses
+only textual features) trained on the same statements.
 
 # Packages
 
-Let's make sure to load all the relevant packages.
+Again, I will start by loading relevant packages.
 
-```{r packages, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE}
 # before knitting: message = FALSE, warning = FALSE
 library(tidyverse) # cleaning and visualization
 library(caret) # modeling
-library(kernlab) # has sigest
+library(kernlab) # has sigest, for selecting tuning parameter sigma
 
 ```
 
 # Load Data
 
-Next, I will again load the pre-processed data, which we created earlier
-(see [Data Cleaning & Pre-Processing](./hld_CLEAN.html)). As a reminder,
-this dataset has a row for each of 5,004 statements, a column indicating whether 
-that particular statement was a truth or a lie, and 90 possible predictor variables for 
-each statement, which comes from the textual features we extracted earlier.
+Next, I will load the data file, we created [earlier](./hld_HMODEL_overview.html),
+which has both the cleaned and processed textual features and human predictions.
+Note, again, that these data files consists of a total of 3,663 statments.
 
-```{r load}
+```{r}
 # load df of combined human and processed textual feature and ground truth
 load("stats_combo.Rda")
+
+# For rendering, I'm going to cheat here and load results created when this model was first run
+# For some reason, chunks that were supposed to be cached when originally run are rerunning
+# load("results_HYB_svm.Rda")
+# change the specific names (renamed at end), back to generic name
+# results_HYB_svm -> results
+# model_hybrid_svm -> model_hybrid
+# model_non_hybrid_svm -> model_non_hybrid
 
 ```
 
 ```{r}
-# change predictions to 0-1 valued variable
-stats_combo1 <-
+# convert predict column from factor (truth, lie) to numeric (1, 0); for use by sigest
+stats_combo <-
   stats_combo %>%
   mutate(predict = case_when(predict == "truth" ~ 1,
                              predict == "lie" ~ 0))
 
-# print resultant df
-stats_combo1
-
-# try without predictions at all
-stats_combo2 <- stats_combo %>% select(-predict)
-
+# print
+stats_combo
 ```
 
+# EXAMPLE (Single Support Vector Machine Model, with Radial Basis Function)
 
-# EXAMPLE (Support Vector Machine, with Radial Basis Function)
-
-As usual, let's begin with an example. We will conduct one training-testing
-split and create and assess the performance of of one resultant support 
-vector machine model, with a radial basis kernel function.
+As usual, let's begin with a singular example. Here we will simply train and test
+two support vector machine models: one hybrid model that takes into accounts
+both human predictions and textual features and one that only takes into
+account textual features. As with our original support vector machine models,
+we will use radial basis kernel functions, to take advantage of SVMs ability 
+to produce non-linear classification boundaries (see discussion in final
+introductory paragraphs of earlier 
+[SVM page, right above "Packages" section](./hld_MODEL_logistic.html),
+for some more discussion).
 
 ## Split Sample Into Training and Testing Sets
 
-As with our [logistic regression models](./hld_MODEL_logistic.html), we will
-conduct a 50-50 training-testing split, randomly allocating one half of the 
-statements to the training set, and the other half to the testing set using the
-createDataPartition function in the caret package (Kuhn, 2008).
+As before, we are going to conduct an exact 50-50 split,
+randomly allocating one half of the statements to the training set, and
+the other half to the testing set (using the createDataPartition function in the 
+caret packages; Kuhn, 2008; Kuhn, 2019). The exact same training set will be
+used to build the hybrid and non-hybrid models, both of which will then also be tested
+on the exact same testing set.
 
-```{r partition}
+```{r, cache = FALSE}
 # set seed, so that statistics don't keep changing for every analysis
 set.seed(2019)
 
 # partition data in 50-50 lgocv split (create index for test set)
 index_train_ex <- 
-  createDataPartition(y = stats_combo2$stat_id,
+  createDataPartition(y = stats_combo$stat_id,
                       p = 0.50,
                       times = 1,
                       list = FALSE)
 
 # actually create data frame with training set (predictors and outcome together)
-train_set_ex <- stats_combo2[index_train_ex, ]
+train_set_ex <- stats_combo[index_train_ex, ]
 
 # actualy create data frame with test set (predictors and outcome together)
-test_set_ex <- stats_combo2[-index_train_ex, ]
+test_set_ex <- stats_combo[-index_train_ex, ]
 
 ```
 
 ## Build Model (on Training Set)
 
-Now that the data are split, we can fit an SVM (radial basis) to the training data.
-We can do this by selecting the "svmRadial" model in the  "train" function of
-the caret package (Kuhn, 2008; [Kuhn, 2019](https://topepo.github.io/caret/train-models-by-tag.html)).
+Now that the data are split, we can fit support vector machine models to the training
+data. Again, we will fit two support vector machine models. One, a hybrid model that uses
+both textual features and human guesses as predictors. An the other, a non-hybrid
+model that uses on textual features as predictors. 
 
-Unlike with our logistic regression model, we have two free tuning parameters,
-which need to be set. These are our cost penalty and our sigma parameter in
-the radial basis function.
+As with our earlier support vector machine models, and unlike with our logistic
+regression models, this model has two tuning parameters that we need to set:
+our cost penalty and our sigma parameter in the radial basis function. As before,
+I will set the sigma parameter using the slightly modified recommendations from the
+sigest function in the kernlab package. And as before, I will select a cost penalty
+by cycling through the candidate values of 0.25, 0.5, 1, 2, and 4, and selecting
+the value that leads to the highest level of overall accuracy across 3 repeated
+50-50 training testing splits (see "Build Model (on Training Set)" section of earlier
+[SVM page](./hld_MODEL_logistic.html) for more detailed discussion).
 
-The default behavior of the train function for our dataset would be to run through
-three different cost penalties: 0.25, 0.50, and 1.0. And the default behavior
-of the train function for our dataset would be to select a single sigma value
-(rather than trying out several), by taking the mean of the multiple sigma values
-suggested for our dataset by the sigest function in the kernlab package. (Oddly,
-the default code seems to take the mean of these values, excluding the second suggestion
-for no apparent reason [see here for discussion](https://stats.stackexchange.com/questions/408159/what-is-the-basis-for-the-default-sigma-value-used-by-svmradial-in-caret). Thus, I override this and simply take the median of all
-the sigma values suggested by the sigest function). Thus, we will hold the 
-sigma parameter constant, using the (slightly modified) value derived from the
-sigest function. To evaluate a more broad host of cost penalties, I will cycle
-through values from: 0.25, 0.5, 1, 2, and 4.
 
-In the end, we must settle on a single value for each of the two free parameters in
-our model. Our sigma value is already constant, so this is done. No choices to make
-there. But we must select one cost penalty among our several candidates (0.25, 0.50,
-1, 2, and 4). The process of selecting among different parameters is called model 
-"tuning". To select among the candidate cost penalty parameter values, we will
-conducted a nested version of testing/training process within the training dataset 
-we are restricted to here (we will not touch the 2500 entry testing dataset
-we set aside earlier). For each possible parameter value (e.g. cost penalty = 0.25,
-cost penality = 0.50, etc), we can train a model with that parameter value
-on a subset of the training data and evaluate the performance of
-that model on another subset of the training data (essentialy a test set, within
-the trainin set). To create these subsets within our training data we can use 
-the same data splitting techniques from before (i.e. cross-validation, repeated 
-training/testing splits). For the sake of consistency, I will use the same 
-data-splitting technique for model tuning as we used for the overall training-testing
-split: a 50-50, random split (i.e. the ~2500 entry training set will be further
-subdivide into a ~1250 entry sub-training-set training set and a ~1250 sub-training-set
-testing set). For each parameter value, we will actually repeat this process 3 times,
-and the performance of the model with that parameter value will be the average 
-across these three rounds (the metric by which performance will be evaluated here
-will be overall accuracy; however other metrics could also be used like [AUC](https://en.wikipedia.org/wiki/Receiver_operating_characteristic#Area_under_the_curve)).
-
-These model tuning process is completed below, followed by a summary of our results.
-As we can see in the textual output, our sigma parameter value was held constant
-(at sigma = 0.0057), and the cost penalty parameter that resulted in the
-best performance was a cost penalty of 2 (which led to an average accuracy rate of
-61.3%). Thus, the svm (radial basis) model we select will have its tuning parameters 
-set to: sigma = 0.0057, and cost penalty = 2.
-
-```{r}
+```{r svm_tune_params}
 # note: these setting chunks are separated for reuse later
 
 # set seed, so that statistics don't keep changing for every analysis
@@ -163,7 +136,7 @@ costs_svm <- c(0.25, 0.5, 1, 2, 4)
 # (default in caret is to take mean, excluding second suggestion)
 # see: https://github.com/topepo/caret/blob/master/models/files/svmRadial.R
 # and: https://stats.stackexchange.com/questions/408159/what-is-the-basis-for-the-default-sigma-value-used-by-svmradial-in-caret
-sigma_svm <- median(
+sigma_hyb_svm <- median(
               kernlab::sigest(
                 as.matrix(train_set_ex 
                             %>% select(
@@ -174,9 +147,24 @@ sigma_svm <- median(
                 )
               )
 
+sigma_non_hyb_svm <- median(
+              kernlab::sigest(
+                as.matrix(train_set_ex 
+                            %>% select(
+                              -stat_id,
+                              -grd_truth,
+                              -predict)
+                          ),
+                scaled = TRUE
+                )
+              )
+
 # part c: save parameters in tune grid object
-tune_grid_svm <- expand.grid(sigma = sigma_svm,
-                             C = costs_svm)
+tune_grid_hyb_svm <- expand.grid(sigma = sigma_hyb_svm,
+                                 C = costs_svm)
+
+tune_grid_non_hyb_svm <- expand.grid(sigma = sigma_non_hyb_svm,
+                                     C = costs_svm)
 
 # -----------------------------------------------------------------------------
 # STEP 2: SELECT TUNING METHOD
@@ -187,7 +175,7 @@ train_control_svm <- trainControl(method = "LGOCV",
 
 ```
 
-```{r svm_ex, cache = TRUE}
+```{r make_example_models, cache = TRUE, eval = TRUE}
 # set seed, so that statistics don't keep changing for every analysis
 # (applies for models which might have random parameters)
 set.seed(2019)
@@ -199,11 +187,19 @@ start_time <- Sys.time()
 # STEP 3: TRAIN MODEL
 
 # use caret "train" function to train svm
-model_ex <- 
-  train(form = grd_truth ~ . - stat_id,
+model_hybrid <- 
+  train(form = grd_truth ~ . -stat_id,
         data = train_set_ex,
         method = "svmRadial",
-        tuneGrid = tune_grid_svm,
+        tuneGrid = tune_grid_hyb_svm,
+        trControl = train_control_svm,
+        metric = "Accuracy") # how to select among models
+
+model_non_hybrid <- 
+  train(form = grd_truth ~ . -stat_id -predict,
+        data = train_set_ex,
+        method = "svmRadial",
+        tuneGrid = tune_grid_non_hyb_svm,
         trControl = train_control_svm,
         metric = "Accuracy") # how to select among models
 
@@ -212,94 +208,274 @@ total_time <- Sys.time() - start_time
 
 ```
 
-```{r model_ex_print}
-# print out overall summary for tuning process
-model_ex
+```{r}
+# examine tuning parameters selected for non-hybrid model
+model_non_hybrid
+
+```
+
+
+```{r}
+# examine tuning parameters select for hybrid model
+model_hybrid
 
 ```
 
 ## Evaluate Model (on Testing Set)
 
-Now that we have selected values for our two tuning parameters (sigma = 0.0057,
-and cost penalty = 2), let's build our full model and evaluate its peformance.
-(Note that while we build and evaluated models earlier, these were only built on
-subsets (i.e of ~1250 entries) of the training dataset and evaluated on
-diferent subsets of that same training dataset (also of ~1250 entries). Now that
-we have selected our tuning parameters, we want to build a model with those parameters
-on the full training dataset (i.e. ~2500 entries) and evaluate its performance on
-the original training set we put aside at the beginning (also of ~2500 entries)).
+Finally, let's examine and compare the performance of the two models. As before,
+this is done by using the models to generate predictions on the remaining ~50%
+of the data (1831 statements) in the training set. And then examining the performance
+statistics using the confusionMatrix function from the caret package (Kuhn, 2008).
 
-When we evaluate the performance of our tuned model on the holdout testing set, we
-see that it performs well. Its overall accuracy was significantly better than 
-chance: 63.2% [95% CI: 61.3, 65.1%]. And it performed well both in identifying 
-truths (i.e. sensitivity: 61.9%) and identifying lies
-(i.e. specificity: 64.6%). (I wondered if the rate of lie detection (specificity)
-was significantly higher than the rate of truth detection (sensitivity); however,
-a two sample test for equality of proportions revealed this was not the case,
-X^2 = 1.76, p = 0.184.)
+Both models have an overall accuracy level that is above chance:
 
-Finally, we can evaluate the quality of the model's guessing. When the model made 
-a prediction that a statement was a truth, it was correct more often than not 
-(i.e. precision or positive predictive value:
-63.6%). And when it made a prediction that a statement was a lie, it was also
-correct more often than not (i.e. negative predictive value: 62.9%). (Confidence
-intervals can easily be generated for these other four statistics as well (i.e. +/-
-z\*(sqrt(p\*(1-p)/n), where z = 1.96; I won't calculate these for this example,
-but I will do so below in our full analysis.)
+* hybrid model: 64.1% [95% CI: 61.9, 66.3%]
+* non-hybrid model: 63.2% [95% CI: 60.9, 65.4%]
 
-```{r svm_ex_conf, cache = FALSE}
-# note: https://stats.stackexchange.com/questions/52274/how-to-choose-a-predictive-model-after-k-fold-cross-validation
-# which makes clear that we retrain our final model selected after turning on ALL the training data
+And the overall accuracy of the hybrid model is better than the overall accuracy
+of the non-hybrid model. Dissapointingly, however, this difference is not 
+significant, chi-squared = 0.30, p = 0.583. Not even close in fact. This is both
+dissapointing and surprising. [Earlier](./hld_HUMAN_perf.html), we saw that human 
+predictions alone achieved an accuracy of over 55%, which was well above chance.
+And a model trained only on textual features here does well above chance as well
+(overall accuracy > 63%, as seen just above). It would stand to reason that adding
+in human predictions would serve to significantly improve the model. This is of
+course not what happened. I will need to conduct further analyses to examine why this
+is. One possible hypothesis at the moment is that (1) human predictions are 
+somehow redundant with some existing feature or set of features. (Note: this is not to
+say that such a feature or set of features is the actual basis of human judgments,
+just that there might be, for whatever reason, an assocation). However, a priori,
+this seems unlikely to me, knowing the features we have extracted (i.e. it seems
+unlikely to me that human judgments are going to track something as clinical as
+the number of pronouns in a sentence, or even more "human" features like sentiment).
+Another hypothesis relates to (2) the different pattern of guessing by which
+humans and computer models achieve their accuracy. As we saw in our previous 
+analyses, computer models had roughly comparable levels of sensitivity (rate of 
+truth detection) and specificity (rate of lie detection). However, humans had
+much higher sensitivity than specificity. I am not sure of the exact effect of
+this on the hybrid models, but a loose speculation might be that any gains in
+accuracy that might come from adding in human predictions would come from
+correctly identifying a larger portion of truths as truths, however, these would
+be "offset" by increasing the portion of lies that are incorrectly identified.
 
-# make predictions
-preds_ex <-
-  predict(object = model_ex,
-          newdata = test_set_ex,
-          type = "raw")
-      
-# record model performance
-conf_ex <-
-  confusionMatrix(data = preds_ex,
+With regard to other performance metrics, I have not yet conducted formal statistical
+for each of theme, but sensitivity, specificity, precision, and negative predictive
+value look roughly the same between the hybrid and non-hyrbid models.
+
+```{r, cache = FALSE}
+# generate predictions for hybrid model 
+preds_hybrid <-
+  predict(object = model_hybrid,
+                 newdata = test_set_ex,
+                 type = "raw")
+
+# generate predictions for non-hybrid model
+preds_non_hybrid <-
+  predict(object = model_non_hybrid,
+                 newdata = test_set_ex,
+                 type = "raw")
+
+```
+
+```{r}
+# examine hybrid model performance
+conf_hybrid <-
+  confusionMatrix(data = preds_hybrid,
                   reference = test_set_ex$grd_truth,
                   positive = "truth")
-      
-# print confusion matrix
-conf_ex
+
+# print
+conf_hybrid
 
 ```
 
-```{r prop_test}
-# test whether sensitivity is better than specificity
-prop.test(x = c(807, 774),
-          n = c((807+443), (774+476)),
-          alternative = "two.sided")
+```{r}
+# examine non-hybrid model performance
+conf_non_hybrid <-
+  confusionMatrix(data = preds_non_hybrid,
+                  reference = test_set_ex$grd_truth,
+                  positive = "truth")
+
+# print
+conf_non_hybrid
+
+```
+
+```{r}
+# calculate values relevant for test (and some extras, in case i want to compare sensitivity, etc)
+hybrid_truth_correct = conf_hybrid$table[4]
+hybrid_truth_total = conf_hybrid$table[3] + conf_hybrid$table[4]
+hybrid_lie_correct = conf_hybrid$table[1]
+hybrid_lie_total = conf_hybrid$table[1] + conf_hybrid$table[2]
+hybrid_total_correct = hybrid_truth_correct + hybrid_lie_correct
+hyrbid_total_truth_guesses = conf_hybrid$table[2] + conf_hybrid$table[4]
+hyrbid_total_lie_guesses = conf_hybrid$table[1] + conf_hybrid$table[3]
+hybrid_total = sum(conf_hybrid$table)
+
+non_hybrid_truth_correct = conf_non_hybrid$table[4]
+non_hybrid_truth_total = conf_non_hybrid$table[3] + conf_non_hybrid$table[4]
+non_hybrid_lie_correct = conf_non_hybrid$table[1]
+non_hybrid_lie_total = conf_non_hybrid$table[1] + conf_non_hybrid$table[2]
+non_hybrid_total_correct = non_hybrid_truth_correct + non_hybrid_lie_correct
+non_Hyrbid_total_truth_guesses = conf_non_hybrid$table[2] + conf_non_hybrid$table[4]
+non_hyrbid_total_lie_guesses = conf_non_hybrid$table[1] + conf_non_hybrid$table[3]
+non_hybrid_total = sum(conf_non_hybrid$table)
+
 ```
 
 
-# FULL (SVM Models)
+```{r}
+# conduct actual test
+prop.test(x = c(hybrid_total_correct, non_hybrid_total_correct),
+          n = c(hybrid_total, non_hybrid_total),
+          alternative = "two.sided",
+          conf.level = 0.95)
+```
 
-Let's now repeated the process from above 10 times, and evaluate the average
-performance of our SVM (radial basis) model across these 10 iterations.
+```{r}
+# examine z value, using two proportion z-test just for comparison
+
+# function to compute z-value
+# from: https://www.r-bloggers.com/comparison-of-two-proportions-parametric-z-test-and-non-parametric-chi-squared-methods/
+z.prop = function(x1,x2,n1,n2){
+  numerator = (x1/n1) - (x2/n2)
+  p.common = (x1+x2) / (n1+n2)
+  denominator = sqrt(p.common * (1-p.common) * (1/n1 + 1/n2))
+  z.prop.ris = numerator / denominator
+  return(z.prop.ris)
+}
+
+# actual z prop (z = 0.58)
+z_value <-
+  z.prop(x1 = hybrid_total_correct,
+         x2 = non_hybrid_total_correct,
+         n1 = hybrid_total, 
+         n2 = non_hybrid_total)
+
+# get corresponding p-value (two-sided) (p = 0.559)
+p_value <- 2*pnorm(-abs(z_value))
+
+# print z and p
+print(paste("z=", round(z_value, 3),
+            ", p=", round(p_value, 3),
+            sep = ""))
+```
+
+
+# Change in predictions
+
+Let's try to get some insight into how the incorporating human predictions
+changed the predictions made by the hybrid model (as compared to the predictions
+made by the non-hybrid model). As we have discussed [before](./hld_MODEL_overview.html),
+there are only four possibile outcomes when the predictions of a model are compared
+to reality: true positive, true negative, false positive, false negative.
+All of the model's performance depends on these four quantities. We can
+think of the non-hybrid model as a "baseline", upon which the hybrid model might
+improve. The only way the hybrid model might improve upon the non-hybrid model
+is through one of two ways: a statment that was incorrectly predicted as a false negative
+by the non-hybrid model is correctly predicted as a true positive by the hybrid model,
+or a statement that was incorrectly predicted as a false positive by the non-hybrid
+model is correctly predicted as a tur negative by the hybrid model. The rest of the 
+changes either have no effect (a true positive stays a true positive from the non-hybrid
+to a hybrid model, a true negative stays a true negative, a false positive stays a 
+false positive, or a false negative stays a false negative) or are detrimental 
+(a true positive becomes a false negative, or a true negative becomes a false
+positive).
+
+Below, I have tabulated the total number of times these eight possible changes
+have occurred, when the non-hybrid model's predictions are compared to the
+hybrid model's predictions. What we see is that most of the predictions stayed
+the same
+between the non-hybrid and hybrid model (1698 of 1831 predictions, 92.7%, were the
+same). And only a slightly higher number of predictions went from incorrect 
+to correct (75 cases, 4.1%, were either false negative that become true positives
+or false positives that become true negatives) than the number of predictions
+that went from correct to incorrect (58 cases, 3.2%, were either true positives
+that become false negatives or true negatives that became false positives).
+
+More detailed analyses should examine how the human predictions relate to the
+other features used for prediction.
+
+```{r}
+# combine: grd_truth, non_hybrid predictions, hybrd predictions
+preds_comp <-
+  cbind(as.data.frame(test_set_ex$grd_truth),
+        as.data.frame(preds_non_hybrid),
+        as.data.frame(preds_hybrid))
+
+# label columns
+colnames(preds_comp) <- c("grd_truth", "non_hyb", "hyb")
+
+# print
+# preds_comp
+
+# generate additional information
+preds_tally <-
+  preds_comp %>%
+  group_by(grd_truth, non_hyb, hyb) %>%
+  summarize(n = n()) %>%
+  arrange(desc(grd_truth), desc(non_hyb), desc(hyb)) %>%
+  mutate(change_present = case_when(non_hyb == hyb ~ "no",
+                            non_hyb != hyb ~ "yes")) %>%
+  mutate(change_type = case_when(grd_truth == "truth" & non_hyb == "truth" & hyb == "truth" ~ "TP -> TP",
+                            grd_truth == "truth" & non_hyb == "truth" & hyb == "lie" ~ "TP -> FN",
+                            grd_truth == "truth" & non_hyb == "lie" & hyb == "truth" ~ "FN -> TP",
+                            grd_truth == "truth" & non_hyb == "lie" & hyb == "lie" ~ "FN -> FN",
+                            grd_truth == "lie" & non_hyb == "truth" & hyb == "truth" ~ "FP -> FP",
+                            grd_truth == "lie" & non_hyb == "truth" & hyb == "lie" ~ "FP -> TN",
+                            grd_truth == "lie" & non_hyb == "lie" & hyb == "truth" ~ "TN -> FP",
+                            grd_truth == "lie" & non_hyb == "lie" & hyb == "lie" ~ "TN -> TN")) %>%
+  mutate(change_effect = case_when(change_type == "TP -> TP" ~ "nothing",
+                                   change_type == "TN -> TN" ~ "nothing",
+                                   change_type == "FP -> FP" ~ "nothing",
+                                   change_type == "FN -> FN" ~ "nothing",
+                                   change_type == "FN -> TP" ~ "gain",
+                                   change_type == "FP -> TN" ~ "gain",
+                                   change_type == "TP -> FN" ~ "loss",
+                                   change_type == "TN -> FP" ~ "loss")) %>%
+  arrange(change_effect)
+
+# print
+preds_tally
+
+```
+
+```{r}
+# tally the total number of times each type of "change_effect" occurred
+preds_tally %>%
+  group_by(change_effect) %>%
+  summarize(n = sum(n))
+
+```
+
+
+# FULL (Hybrid and Non-Hybrid Logistic Regression Models)
+
+To get more reliable estimates of the performance of non-hybrid and hybrid models,
+let's repeat the exact model training and testing procedure from above 10 times,
+storing and aggregating the results.
 
 ## Run 10 models
 
 Below is the code that runs through this modeling process 10 different times and
 saves the result from each round.
 
-```{r svm_full, cache = TRUE, eval = FALSE}
-# -----------------------------------------------------------------------------
+```{r make_FULL_models, cache = TRUE, eval = FALSE}
+# # -----------------------------------------------------------------------------
 # STEP 0: set seed, so that statistics don't keep changing for every analysis
 set.seed(2019)
 
-# -----------------------------------------------------------------------------
+# # -----------------------------------------------------------------------------
 # STEP 1: decide how many times to run the model
 rounds <- 10
 
 # -----------------------------------------------------------------------------
 # STEP 2: set up object to store results
 # part a: create names of results to store
-result_cols <- c("model_type", "round", "accuracy", "accuracy_LL", "accuracy_UL",
-                 "sensitivity", "specificity", "precision", "npv", "n")
+result_cols <- c("model_type", "hyb_type", "round", "accuracy", "accuracy_LL", "accuracy_UL",
+                 "sensitivity", "specificity", "precision", "npv", "n",
+                 "total_truths", "total_lies", "total_truth_guesses", "total_lie_guesses")
 
 # part b: create matrix
 results <-
@@ -323,58 +499,98 @@ for (i in 1:rounds){
   
   # part a: partition data in 50-50 lgocv split (create index for test set)
   index_train <- 
-    createDataPartition(y = stats_combo2$stat_id,
+    createDataPartition(y = stats_combo$stat_id,
                         p = 0.50,
                         times = 1,
                         list = FALSE)
   
   # part b: create testing and training data sets
-  train_set <- stats_combo2[index_train, ]
-  test_set <- stats_combo2[-index_train, ]
+  train_set <- stats_combo[index_train, ]
+  test_set <- stats_combo[-index_train, ]
   
   
-  # part c: use caret "train" function to train logistic regression model
-  model <- 
-    train(form = grd_truth ~ . - stat_id,
-          data = train_set,
-          method = "svmRadial",
-          tuneGrid = tune_grid_svm,
-          trControl = train_control_svm,
-          metric = "Accuracy") # how to select among models)
+  # part c: use caret "train" function to train hybrid and non-hybrid logistic regression model
+  model_hybrid_i <- 
+  train(form = grd_truth ~ . - stat_id,
+        data = train_set_ex,
+        method = "glm",
+        family = "binomial")
+
+  model_non_hybrid_i <-
+    train(form = grd_truth ~ . -stat_id -predict,
+          data = train_set_ex,
+          method = "glm",
+          family = "binomial")
   
-  # part d: make predictions
-  preds <-
-    predict(object = model,
+  
+  # part d: make predictions, using both hybrid and non-hybrid models
+  preds_hyb_i <-
+    predict(object = model_hybrid_i,
             newdata = test_set,
             type = "raw")
   
-  # part e: store model performance
-  conf_m <-
-    confusionMatrix(data = preds,
+  preds_non_hyb_i <-
+    predict(object = model_non_hybrid_i,
+            newdata = test_set,
+            type = "raw")
+  
+  # part e: store model performance of both hybrid and non-hybrid model
+  conf_hyb_i <-
+    confusionMatrix(data = preds_hyb_i,
                     reference = test_set$grd_truth,
                     positive = "truth")
   
-  # part f: store model results
+  conf_non_hyb_i <-
+    confusionMatrix(data = preds_non_hyb_i,
+                    reference = test_set$grd_truth,
+                    positive = "truth")
+  
+  # part f: store hybrid and non-hybrod model results
   # model type
-  results[i, 1] <- "svm"
+  results[2*i-1, 1] <- "logistic"
+  results[2*i, 1] <- "logistic"
+  # hybrid o non-hybrid
+  results[2*i-1, 2] <- "hybrid"
+  results[2*i, 2] <- "non_hybrid"
   # round
-  results[i, 2] <- i
+  results[2*i-1, 3] <- i
+  results[2*i, 3] <- i
   # accuracy
-  results[i, 3] <- conf_m$overall[1]
+  results[2*i-1, 4] <- conf_hyb_i$overall[1]
+  results[2*i, 4] <- conf_non_hyb_i$overall[1]
   # accuracy LL
-  results[i, 4] <- conf_m$overall[3]
+  results[2*i-1, 5] <- conf_hyb_i$overall[3]
+   results[2*i, 5] <- conf_non_hyb_i$overall[3]
   # accuracy UL
-  results[i, 5] <- conf_m$overall[4]
+  results[2*i-1, 6] <- conf_hyb_i$overall[4]
+  results[2*i, 6] <- conf_non_hyb_i$overall[4]
   # sensitivity
-  results[i, 6] <- conf_m$byClass[1]
+  results[2*i-1, 7] <- conf_hyb_i$byClass[1]
+  results[2*i, 7] <- conf_non_hyb_i$byClass[1]
   # specificity
-  results[i, 7] <- conf_m$byClass[2]
+  results[2*i-1, 8] <- conf_hyb_i$byClass[2]
+  results[2*i, 8] <- conf_non_hyb_i$byClass[2]
   # precision
-  results[i, 8] <- conf_m$byClass[3]
+  results[2*i-1, 9] <- conf_hyb_i$byClass[3]
+  results[2*i, 9] <- conf_non_hyb_i$byClass[3]
   # negative predictive value
-  results[i, 9] <- conf_m$byClass[4]
-  # sample size (of test set)
-  results[i, 10] <- sum(conf_m$table)
+  results[2*i-1, 10] <- conf_hyb_i$byClass[4]
+  results[2*i, 10] <- conf_non_hyb_i$byClass[4]
+  # sample size (total)
+  results[2*i-1, 11] <- sum(conf_hyb_i$table)
+  results[2*i, 11] <- sum(conf_non_hyb_i$table)
+  # total truths
+  results[2*i-1, 12] <- conf_hyb_i$table[3] + conf_hyb_i$table[4]
+  results[2*i, 12] <- conf_non_hyb_i$table[3] + conf_hyb_i$table[4]
+  # total lies
+  results[2*i-1, 13] <- conf_hyb_i$table[1] + conf_hyb_i$table[2]
+  results[2*i, 13] <- conf_non_hyb_i$table[1] + conf_non_hyb_i$table[2]
+  # total truth guesses
+  results[2*i-1, 14] <- conf_hyb_i$table[2] + conf_hyb_i$table[4]
+  results[2*i, 14] <- conf_non_hyb_i$table[2] + conf_non_hyb_i$table[4]
+  # total lie guesses
+  results[2*i-1, 15] <- conf_hyb_i$table[1] + conf_hyb_i$table[3]
+  results[2*i, 15] <- conf_non_hyb_i$table[1] + conf_non_hyb_i$table[3]
   
   # part g: print round and total elapsed time so far
   cumul_time <- difftime(Sys.time(), start_time, units = "mins")
@@ -388,112 +604,226 @@ for (i in 1:rounds){
 
 ## View Results (Tabular)
 
-Below, I've displayed a raw tabular summary of the results from each of the 10 models.
-As before, there is some variability from model to model (e.g. our first model
-had an overall accuracy of 62.8%, while our second model had an overall accuracy of
-61.2%), but for overall story is one of consistency.
+Directly below, I've displayed a raw tabular summary of the results. We have 20 rows,
+which result from the 2 models (hybrid and non-hybrid) created in each of 10
+rounds. One pattern that seems to stand out is that, although like before,
+the hybrid model only has a slightly higher overall accuracy than the hybrid
+model, this holds in every round. In the second chunk below, I have displayed this
+directly. For each round, I print the overall accuracy rate of the hybrid model
+next to the overall accuracy rate for the non-hybrid model. We see that in
+literally every single round, the hybrid model performed better than the
+non-hybrid model. This pattern of results seems unlikely to me, if the hybrid
+and non-hybrid models truly were equivalent in performance. Indeed, when I 
+conduct a simple sign test, which uses a binomial distribution to examine
+how likely it is that one model should have a higher accuracy score than the other
+model for 10 out of 10 rounds, under the null assumption that each model
+should have a higher accuracy score an equal number of times, this pattern
+diverges significanty from that null hypothesis, p = 0.002. Similarly,
+when I conduct a Wilcoxon signed-rank test (which is non-parametric test which
+tests whether there is sufficient evidence to reject the null hypothesis that two
+*dependent* samples are drawn from the same population), this difference appears
+to be significant, V = 55, p = 0.006. This is some evidence to suggest that
+hybrid human-computer models can perform better than non-hybrid computer models,
+which do not incorporate human judgments. (There may be some statistical artifact or
+error that a more statistically savvy person may point out that I am failing to 
+account for, but I cannot think of one. Perhaps there is some form of non-independence
+that I have not accounted for.)
 
-```{r full_results}
+
+```{r}
+# print results (long form)
 results
   
 ```
 
-## View Results (Graphically)
-
-The average SVM model performance across our the 10 iterations is plotted below,
-where our five primary performance statistics are highlighted (accuracy, sensitivity,
-specificity, precision and negative predictive value). All are significantly above
-50% (and we see that for overall accuracy, the lower bound of the 95% confidence
-interval is even above 60%).
-
-```{r viz_full_results}
-# calculate average sample size
-mean_n <- mean(results$n)
-
-# create df to use for visualization
-results_viz <-
+```{r}
+# get data in wide format (with accuracy for hybrid and non_hybrid models next to each other)
+results_acc_wide <-
   results %>%
-  group_by(model_type) %>%
-  summarize(accuracy = mean(accuracy),
-            sensitivity = mean(sensitivity),
-            specificity = mean(specificity),
-            precision = mean(precision),
-            npv = mean(npv)) %>%
-  select(-model_type) %>%
-  gather(key = "perf_stat",
-         value = "value") %>%
-  mutate(value = as.numeric(value))
+    select(hyb_type, round, accuracy) %>%
+    spread(key = hyb_type,
+           value = accuracy)
 
-# actual visualization
-ggplot(data = results_viz,
-  aes(x = perf_stat,
-           y = value)) +
-geom_point(size = 2,
-           color = "#545EDF") +
-geom_errorbar(aes(ymin = (value - 1.96*sqrt(value*(1-value)/mean_n)),
-                   ymax = (value + 1.96*sqrt(value*(1-value)/mean_n))),
-              color = "#545EDF",
-              width = 0.15,
-              size = 1.25) +
-geom_hline(yintercept = 0.5,
-           linetype = "dashed",
-           size = 0.5,
-           color = "red") +
-scale_y_continuous(breaks = seq(from = 0, to = 1, by = 0.05),
-                   limits = c(0, 1)) +
-scale_x_discrete(limits = rev(c("accuracy", "sensitivity", "specificity", 
-                            "precision", "npv"))) + 
-coord_flip() +
-theme(panel.grid.major.x = element_line(color = "grey",
-                                        size = 0.25),
-      panel.grid.minor.x = element_blank(),
-      panel.grid.major.y = element_blank(),
-      panel.background = element_blank(),
-      axis.ticks = element_blank(),
-      plot.title = element_text(hjust = 0.5),
-      axis.title.y = element_text(margin = 
-                                    margin(t = 0, r = 10, b = 0, l = 0)),
-      axis.title.x = element_text(margin = 
-                                    margin(t = 10, r = 00, b = 0, l = 0)),
-      axis.text.x = element_text(angle = 90)) +
-labs(title = "Performance Statistics (Support Vector Machine)",
-     x = "Performance Statistic",
-     y = "Proportion (0 to 1)")
-
+# print
+results_acc_wide %>%
+  mutate(winner = case_when(hybrid > non_hybrid ~ "hybrid",
+                            hybrid < non_hybrid ~ "non-hybrid",
+                            hybrid == non_hybrid ~ "tie"))
 
 ```
 
+```{r}
+# sign test, via binomial test
+binom.test(x = 10,
+           n = 10,
+           p = 0.5)
+
+```
+
+```{r}
+# conduct Wilcoxon signed-rank test 
+wilcox.test(x = results_acc_wide$hybrid,
+            y = results_acc_wide$non_hybrid,
+            paired = TRUE,
+            conf.int = 0.95)
+```
+
+## View Results (Graphically; Overall Accuracy)
+
+When we visually examine the average overall accuracy rate of non-hybrid and hybrid 
+models across 10 rounds, we see much the same pattern of results we saw when compared
+these two model types only once in the example case with which we led. The hybrid 
+model has a slightly higher level of overall accuracy than the non-hybrid model
+(although, as we see the confidence intervals for the two models overall accuracy
+rates overlap).
+
+```{r}
+# average n in test set for hybrid and non-hybrid models
+total_hyb <- mean((results %>% filter(hyb_type == "hybrid"))$n)
+total_non_hyb <- mean((results %>% filter(hyb_type == "non_hybrid"))$n)
+
+# vector of denominators to use, when creating error bars
+denoms_overall <- c(total_hyb,
+                    total_non_hyb)
+
+# visualize overall accuracy
+results %>%
+  group_by(hyb_type) %>%
+  summarize(accuracy = mean(accuracy)) %>%
+  ggplot(aes(x = hyb_type,
+             y = accuracy)) +
+  geom_point(size = 2,
+             color = "#545EDF") +
+  geom_errorbar(aes(ymin = accuracy - 1.96*sqrt(accuracy*(1-accuracy)/denoms_overall),
+                     ymax = accuracy + 1.96*sqrt(accuracy*(1-accuracy)/denoms_overall)),
+                color = "#545EDF",
+                width = 0.05,
+                size = 1) +
+  geom_hline(yintercept = 0.5,
+             linetype = "dashed",
+             size = 0.5,
+             color = "red") +
+  scale_y_continuous(breaks = seq(from = 0.49, to = 0.70, by = 0.01),
+                     limits = c(0.49, 0.70)) +
+  scale_x_discrete(limits = c("non_hybrid", "hybrid")) +
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.y = element_line(color = "grey",
+                                          size = 0.25),
+        panel.background = element_blank(),
+        axis.ticks = element_blank(),
+        plot.title = element_text(hjust = 0.5),
+        axis.title.y = element_text(margin = 
+                                      margin(t = 0, r = 10, b = 0, l = 0)),
+        axis.title.x = element_text(margin = 
+                                      margin(t = 10, r = 00, b = 0, l = 0))) +
+  labs(title = "Accuracy by Model Type",
+       x = "Model Type",
+       y = "Overall Accuracy")
+```
+
+## View Results (Graphically; Sensitivity, Specificity, Precision, Negative Predictive Value)
+
+We see a similar pattern of results when we examine the other four major performance
+statistics average across 10 rounds. The hybrid model has a higher average level of
+sensitivity, specificity, precision, and negative predictive value (although again
+confidence intervals overlap).
+
+```{r, fig.width=8, fig.height=8}
+# average n in test set for hybrid and non-hybrid models
+total_truths_hyb <- mean((results %>% filter(hyb_type == "hybrid"))$total_truths)
+total_truths_non_hyb <- mean((results %>% filter(hyb_type == "non_hybrid"))$total_truths)
+total_lies_hyb <- mean((results %>% filter(hyb_type == "hybrid"))$total_lies)
+total_lies_non_hyb <- mean((results %>% filter(hyb_type == "non_hybrid"))$total_lies)
+total_truth_guesses_hyb <- mean((results %>% filter(hyb_type == "hybrid"))$total_truth_guesses)
+total_truth_guesses_non_hyb <- mean((results %>% filter(hyb_type == "non_hybrid"))$total_truth_guesses)
+total_lie_guesses_hyb <- mean((results %>% filter(hyb_type == "hybrid"))$total_lie_guesses)
+total_lie_guesses_non_hyb <- mean((results %>% filter(hyb_type == "non_hybrid"))$total_lie_guesses)
+
+# vector of denominators to use, when creating error bars
+denoms_perf <- c(total_truths_non_hyb,
+                 total_truths_hyb,
+                 total_lies_non_hyb,
+                 total_lies_hyb,
+                 total_truth_guesses_non_hyb,
+                 total_truth_guesses_hyb,
+                 total_lie_guesses_non_hyb,
+                 total_lie_guesses_hyb)
+
+# visualize results
+results %>%
+  select(hyb_type, round, sensitivity, specificity, precision, npv) %>%
+  gather(key = "metric",
+         value = "value",
+         sensitivity, specificity, precision, npv) %>%
+  group_by(hyb_type, metric) %>%
+  summarize(value = mean(value)) %>%
+  ungroup() %>%
+  mutate(metric = factor(metric,
+                            levels = c("sensitivity", "specificity", "precision", "npv"))) %>%
+  ggplot(aes(x = hyb_type,
+             y = value)) +
+  geom_point(size = 2,
+             color = "#545EDF") +
+  geom_errorbar(aes(ymin = value - 1.96*sqrt(value*(1-value)/denoms_perf),
+                     ymax = value + 1.96*sqrt(value*(1-value)/denoms_perf)),
+                color = "#545EDF",
+                width = 0.05,
+                size = 1) +
+  geom_hline(yintercept = 0.5,
+             linetype = "dashed",
+             size = 0.5,
+             color = "red") +
+  scale_y_continuous(breaks = seq(from = 0.50, to = 0.70, by = 0.05),
+                     limits = c(0.49, 0.70)) +
+  scale_x_discrete(limits = c("non_hybrid", "hybrid")) +
+  facet_grid(metric ~ .) +
+  theme(panel.grid.major.x = element_blank(),
+        panel.grid.minor.x = element_blank(),
+        panel.grid.major.y = element_line(color = "grey",
+                                          size = 0.25),
+        plot.background = element_blank(),
+        panel.background = element_blank(),
+        panel.border = element_rect(colour = "black", fill=NA, size=1),
+        axis.ticks = element_blank(),
+        plot.title = element_text(hjust = 0.5),
+        axis.title.y = element_text(margin = 
+                                      margin(t = 0, r = 10, b = 0, l = 0)),
+        axis.title.x = element_text(margin = 
+                                      margin(t = 10, r = 00, b = 0, l = 0))) +
+  labs(title = "Metrics by Model Type",
+       x = "Model Type",
+       y = "Proportion")
+
+```
+
+
 # Save Results
 
-```{r save, eval = FALSE}
+For now, this concludes our analysis. As our last step, lets save our results. 
+
+```{r save, eval=FALSE}
 # rename results df, to be particular to this model type (for disambiguation later)
-results_svm <- results
+results_HYB_log <- results
+model_hybrid_log <- model_hybrid
+model_non_hybrid_log <- model_non_hybrid
 
 # clear results variable
 rm(results)
 
 # save results in Rda file
-save(results_svm,
-     file = "results_svm.Rda")
+save(results_HYB_log,
+     # model_hybrid_log,
+     # model_non_hybrid_log,
+     file = "results_HYB_log.Rda")
 ```
 
-# Render
-
-If needed, I can render with rmarkdown::render("hld_MODEL_svm.Rmd").
 
 # Citations
 
-* Bakshy, E., Messing, S., & Adamic, L. A. (2015). Exposure to ideologically 
-diverse news and opinion on Facebook. Science, 348(6239), 1130-1132. 
-https://doi.org/10.1126/science.aaa1160
-
-* Kuhn, M. (2008). Building predictive models in R using the caret package.
+* Kuhn, M. (2008). Building predictive models in R using the caret package. 
 Journal of Statistical Software, 28(5), 1-26.
 
-* Kuhn, M., & Johnson, K. (2013). Applied predictive modeling (Vol. 26). Springer.
-
-* Wu, X., Kumar, V., Quinlan, J. R., Ghosh, J., Yang, Q., Motoda, H., . Philip, S. Y. (2008). 
-Top 10 algorithms in data mining. Knowledge and Information Systems, 14(1), 1-37.
-
+* Kuhn, M. (2019). The caret Package. Retrieved from https://topepo.github.io/caret/index.html
 
 # END
