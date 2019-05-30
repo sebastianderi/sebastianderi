@@ -42,7 +42,10 @@ load("stats_combo.Rda")
 # For rendering, I'm going to cheat here and load results created when this model was first run
 # For some reason, chunks that were supposed to be cached when originally run are rerunning
 load("results_HYB_log.Rda")
-results <- results_HYB_log # change the specific named (renamed at end), back to generic name
+# change the specific names (renamed at end), back to generic name
+results_HYB_log -> results
+# model_hybrid_log -> model_hybrid
+# model_non_hybrid_log -> model_non_hybrid
 
 # print combined file
 stats_combo
@@ -97,7 +100,7 @@ both textual features and human guesses as predictors. An the other, a non-hybri
 model that uses on textual features as predictors. These two models are fit to the
 training data below.
 
-```{r make_example_models, cache = FALSE, eval = FALSE}
+```{r make_example_models, cache = FALSE, eval = TRUE}
 # set seed, so that statistics don't keep changing for every analysis
 # (applies for models which might have random parameters)
 set.seed(2019)
@@ -169,14 +172,14 @@ value look roughly the same between the hybrid and non-hyrbid models.
 # generate predictions for hybrid model 
 preds_hybrid <-
   predict(object = model_hybrid,
-          newdata = test_set_ex,
-          type = "raw")
+                 newdata = test_set_ex,
+                 type = "raw")
 
 # generate predictions for non-hybrid model
 preds_non_hybrid <-
   predict(object = model_non_hybrid,
-          newdata = test_set_ex,
-          type = "raw")
+                 newdata = test_set_ex,
+                 type = "raw")
 
 ```
 
@@ -363,7 +366,7 @@ storing and aggregating the results.
 Below is the code that runs through this modeling process 10 different times and
 saves the result from each round.
 
-```{r make_FULL_models, cache = TRUE}
+```{r make_FULL_models, cache = TRUE, eval = FALSE}
 # # -----------------------------------------------------------------------------
 # STEP 0: set seed, so that statistics don't keep changing for every analysis
 set.seed(2019)
@@ -715,8 +718,8 @@ rm(results)
 
 # save results in Rda file
 save(results_HYB_log,
-     model_hybrid_log,
-     model_non_hybrid_log,
+     # model_hybrid_log,
+     # model_non_hybrid_log,
      file = "results_HYB_log.Rda")
 ```
 
