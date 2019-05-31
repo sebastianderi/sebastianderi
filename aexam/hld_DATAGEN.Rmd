@@ -75,7 +75,7 @@ rather than declarative memory. Further, these personally relevant statements
 can be intuitively grouped into some overarching categories:
 
 * true and false representations of one's opinions (e.g. favorite movie,
-opiion on a friend)
+opinion on a friend)
 * true and false representations of oneself (e.g. one's hobbies)
 * true and false representations of events that one might have experienced (e.g.
 whether someone actually stole money or not).

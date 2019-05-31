@@ -12,7 +12,7 @@ output:
 In this section, we will generate our second hybrid human-computer model.
 This will be a support vector machine model. The general training-testing and
 model building procedure will be exactly the same as for our earlier
-[support vector machine model](./hld_MODEL_logistic.html), with the exception
+[support vector machine model](./hld_MODEL_svm.html), with the exception
 that our hybrid model will also take into account human predictions
 as a feature. The performance of this model will be compared to the performance 
 of a non-hybrid model (which uses only textual features) trained on the same
@@ -67,7 +67,7 @@ both human predictions and textual features and one that only takes into
 account textual features. As with our original support vector machine models,
 we will use a radial basis kernel function, to take advantage of SVMs ability 
 to produce non-linear classification boundaries (see final introductory paragraphs
-of earlier [SVM page, right above "Packages" section](./hld_MODEL_logistic.html),
+of earlier [SVM page, right above "Packages" section](./hld_MODEL_svm.html),
 for some more discussion).
 
 ## Split Sample Into Training and Testing Sets
@@ -113,7 +113,7 @@ sigest function in the kernlab package. And as before, I will select a cost pena
 by cycling through the candidate values of 0.25, 0.5, 1, 2, and 4, and selecting
 the value that leads to the highest level of overall accuracy across 3 repeated
 50-50 training testing splits within the training set (see "Build Model (on Training Set)"
-section of earlier [SVM page](./hld_MODEL_logistic.html) for more detailed discussion).
+section of earlier [SVM page](./hld_MODEL_svm.html) for more detailed discussion).
 
 When we go through this process, we end up with two trained models with the 
 following (highly similar) tuning parameter values:

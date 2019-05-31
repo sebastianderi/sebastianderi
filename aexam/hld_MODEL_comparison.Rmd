@@ -9,11 +9,13 @@ output:
 
 [return to [overview page](./hld_OVERVIEW.html)]
 
-Let's now compare the performance of the various different models we created.
+Very quickly and without doing any statistical tests for the moment, I would
+like to visually compare the performance of the three different types of models
+we created: logistic regression, support vector machine, and neural network,
 
 # Packages
 
-Again, I will start by loading relevant packages.
+As usual, I will start by loading relevant packages.
 
 ```{r, message=FALSE, warning=FALSE}
 # before knitting: message = FALSE, warning = FALSE
@@ -24,7 +26,7 @@ library(tidyverse) # cleaning and visualization
 # Load Data
 
 I will now load the summary results from each of the different models we created
-in the earlier sections.
+in the earlier sections, and combine them together.
 
 ```{r}
 # load results df's from each of the models we created
@@ -51,6 +53,10 @@ n_neural <- mean(results[results$model_type == "neural", ]$n)
 
 
 # Comparison (Overall Accuracy)
+
+When we look at overall accuracy, it looks like the neural network model had the best
+performance, followed by the support vector machine, which itself was followed
+by the logistic regression model.
 
 ```{r}
 results %>%
@@ -90,6 +96,12 @@ results %>%
 ```
 
 # Comparison (Sensitivity, Specificity, Precision, Negative Predictive Value)
+
+We see the exact same ordering of results when examining the other four key
+performance statistics: sensitivity, specificity, precision, and negative
+predictive value. The highest performance always comes from the neural network
+model, followed by the support vector machine model, which is then followed
+by the logistic regression model.
 
 
 ```{r, fig.width=8, fig.height=8}
@@ -139,7 +151,6 @@ results %>%
 
 ```
 
-
-
+This is all I wanted to examine, for the moment.
 
 # END

@@ -1,0 +1,114 @@
+---
+title: "Hybrid Lie Detection (Final Summary)"
+author: Sebastian Deri
+output:
+  html_document:
+    df_print: paged
+---
+
+[return to [overview page](./hld_OVERVIEW.html)]
+
+I thought it would be abrupt for this report to end without some final evaluation
+of what we've found, what to make of it, and where we might go. Thus, I review
+main results, future directions, and limitations below.
+
+# Main Results
+
+As I see it, the main results of this report are the following.
+
+* "Pure" non-hybrid computre models were able to perform better than chance, 
+achieving accuracy rates well above 50% for each of the three model types 
+(~58% for the logistic regression models, ~62% for the SVM models, and ~65% for
+the neural network models).
+
+* Humans were also able to detect lies at rates that were well above chance (>55%
+overall accuracy across 3000+ guesses).
+
+* I thought these two results, along with the almost incontrovertible postulate
+that human and computer predictions are formed under different bases, would
+guarantee a third result: that hybrid computer models, which take into account
+human predictions as model features (in addition to standard textual features)
+would outperform non-hybrid computer models (which only take into account textual
+features). The results here were dissapointing, and not as strong as I expected.
+It is true that across 30 different rounds of training hybrid and non-hybrid models
+of three types (logistic, svm, and neural), hybrid models out-performed non-hybrid 
+models 25 out of 30 times (83%). It seems likely to me that this result would
+hold up across an even greater number of rounds, or even greater diversity of
+statistical learning models. However, the size of the increases in performance
+observed so far were not as large as I'd hoped or expected (usually, hybrid models
+were better than non-hybrid models by around one or two percentage points). 
+
+# Future Directions and Future Analyses
+
+The highest priority next step is to collect predictions on the full set of
+5,004 statements. While I do not expect that this will change the size of the
+improvement that hybrid models exhibit over non-hybrid models, it will "complete"
+the dataset. And this will allow for higher powered tests of the difference in
+performance between the hybrid and non-hybrid models. (i.e. Even if those
+one or two percentage point improvements don't change in size, they will at
+least be statistically "significant".)
+
+Another priority after this is examining ways that the performance of hybrid models
+may be further improved. The hybrid models I've constructed so far have been the
+simplest possible hybrid models that can be imagined. I simply added one more
+feature, derived from human judgment -- human predictions. However, incorporating
+other human judgments may further improve hybrid model performance. For one,
+since we already have them, I would like to examine whether there might not be
+a way to improve performance by incorporating human confidence ratings. As we saw,
+in our dataset, confidence ratings did track accuracy. Thus, adding a term
+that adjusts predictions for confidence may improve the performance of the model.
+In the future, other human judgments (and their additive effects) might further
+improve hybrid models. Humans can render an infinite amount of judgments that
+computers cannot. These may prove useful predictive features. For example, I am
+imagining having people read over the statements and rendering judgments like:
+"Has anything like this ever happened to you?", "How common or typical is the
+opinion expressed in this statement?", "Is this person using artificial or
+exaggerated language?". I believe that judgments like these likely provide some
+cue about the veracity of a statement; a cue that hybrid computer models can be
+trained to optimally incorporate.
+
+I am also very curious to break the analyses down by question. In all the analyses
+so far, the responses to different questions were all lumped together. However, 
+of course, each statement was a response to one of 6, fairly different, questions. 
+I suspect that humans might perform better on some types of questions than others. 
+Specifically, I think humans might be better at identifying insincere opinions (e.g.
+"Give some reasons why you like [person X") than false representations of factual 
+events (e.g. "Please describe what you did yesterday"). Similarly, it might be the
+case that there are more obvious textual cues of deception in response to certain
+types of questions than in response to others. Thus, I suspect that building
+separate models for each question (or otherwise incorporating questions into
+hybrid and non-hybrid models) would likely improve performance.
+
+# Limitations
+
+The most obvious limitation of this analysis, as I see it, is the extent to which
+any results can be applied to "real world" truth and lie detection. One particular
+concern that is in my mind is that the nature of lies told here are very different
+than the nature of the lies told in "real life". Specifically, here participants
+were directly asked to generate untrue statements in response to various questions
+(e.g. "What is something in your life that you regret?"). Thus, their explicit
+goal was to successfully construct a fabrication. They will have failed the
+assignment if they do not successfully come up with a false narrative. In real life, 
+when someone is lying, this isn't their goal. A person is usually trying to hide
+some piece of information. A failure in this case comes if they are caught.
+Aside from the concealment, they usually try to hem as close to the truth as 
+possible. And of course, there are usually high stakes to getting caught,
+whereas here there was not (indeed almost the opposite, as they were explicity
+instructed *to* lie). Thus, statements made when lying in real life might look very 
+different from the statements we have collected here, rendering the predictions 
+of the models inapplicable and not effective.
+
+However, a few responses to this should be noted. First, the instructions did direct
+participants to "make sure your lies are convincing, and not simply things that are 
+impossible or ridiculous. That is, for the lies that you give, it should be reasonable
+for someone to have actually answered that way." Second, even though the context
+of our study and real life are not exactly the same, at least some of the mental
+operations people go through when lying in either case may be the same. And thus,
+some cues to lying in this dataset migth also be cues to lying in real life.
+Third, the goal in this study wasn't necessarily to build a model that can be
+directly used for actual lie detection in real life. But rather, it is to merely
+demonstrate that the predictive capabilites of humans and computers can be
+combined in a way that leads to truth and lie detection performance that is better
+than either could achieve alone. The goal is "proof of concept".
+
+# END

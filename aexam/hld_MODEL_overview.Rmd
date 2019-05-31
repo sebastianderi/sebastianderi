@@ -262,14 +262,14 @@ pred_plot +
   geom_rect(aes(xmin = 0.25,
                 xmax = 8.5,
                 ymin = 0.25,
-                ymax = 5.5),
+                ymax = 5.4),
             fill = "transparent",
             color = "black",
             linetype = "solid") +
   geom_rect(aes(xmin = 0.25,
                 xmax = 6.5,
                 ymin = 5.5,
-                ymax = 11),
+                ymax = 10.8),
             fill = "transparent",
             color = "black",
             linetype = "solid")
@@ -326,7 +326,7 @@ pred_plot +
   geom_rect(aes(xmin = 0.25,
                 xmax = 8.5,
                 ymin = 0.25,
-                ymax = 5.5),
+                ymax = 5.4),
             fill = "transparent",
             color = "black",
             linetype = "solid")
@@ -376,8 +376,8 @@ pred_plot +
             linetype = "dotted") +
   geom_rect(aes(xmin = 0.25,
                 xmax = 6.5,
-                ymin = 5.5,
-                ymax = 11),
+                ymin = 5.6,
+                ymax = 10.8),
             fill = "transparent",
             color = "black",
             linetype = "solid")
@@ -509,62 +509,148 @@ these include:
 
 # Data Splitting, for Model Training and Testing
 
-All of the above presupposes that we have trained our model on a certain portion
-of our data and then tested it on a separate portion of our data. However, there
-are actually any way to conduct this split.
-
-The golden rule in predictive modeling is to never use the same data that the model was built on to
-assess the model's performance. There are many different strategies for how to
-split the data into training and test sets.
-
-There are many different ways to split up the data. Which is best depends on the
-nature of the dataset and personal preference. Three major categories of data 
-splitting strategies are the following:
+The golden rule in predictive modeling is to never use the same data that the model 
+was built on to assess the model's performance. All of the above has presupposed that 
+we have already trained ("fit") a model on a certain portion of a dataset and are 
+now using that model to make predictions on a different portion of the dataset. 
+However, there are actually many different strategies for how to split the data 
+into training and test sets. The most popular of these tend to fall into one of
+these three categories (Kuhn & Johnson, 2013, Chapter 4):
 
 * k-fold cross validation
 * repeated training/testing splits
 * bootstrapping
 
+Each of these provide a different process for repeated splitting up a dataset
+into training and testing portions, and evaluating the performance of a model
+over and over.
+
 ## K-fold cross validation
 
 In k-fold cross validation, we divide our entire data set into mutually exclusive
-(disjoint) sets.
+(disjoint) sets. If we divide the dataset into k different portions, then we
+conduct k number of rounds of training and testing. In each of these rounds,
+we hold out 1 portion of data for testing the model and use the remaining k-1
+sections for training. This is repeated k times, which each 
 
-A very common type of cross validation is 10-fold cross validation, where the data set is split
-into 10 sections, 
+For example, we can imagine a dataset with 100 rows. In 10-fold cross validation,
+we would divide this dataset into 10 different junks: chunk 1 (consisting of 10 rows),
+chunk 2 (consisting of a different 10 rows), chunk 3 (consisting of yet another
+set of 10 rows), and so on up until chunk 10, whereupon each of our 100 observations
+will be in one of the 10 chunks. (Usually, allocation to chunks is done through
+randomization.) Then, in the first round of model building, we could fit a model 
+to chunks 1-9 combined, and test the performance of that model by making predictions
+on chunk 10. In the next round, we could fit a model to chunks 1-8 & 10 combined, 
+and test the performance of that model by making predictions on chunk 9. In round 
+after that, we could fit a model to chunks 1-7 & 9-10 combined, and then test the 
+performance of that model by making predictions on chunk 8. And so on, until we
+have done this 10 times (each of the 10 chunks will have been used as a testing
+set once). (A very common type of k-fold cross validation is indeed 10-fold cross
+validation.)
+
+A key feature of k-fold cross validation is that across our k rounds of training
+and training, none of the rows that are used in one round of testing will ever be 
+used again in another round of testing. This is depicted below in a figure from
+(Kuhn & Johnson, 2013, p.71). They depict a hypothetical dataset consisting of
+12 observations ("rows" in my terminology). We then see how model training and
+testing proceeds in a case of 3-fold cross validation on this dataset. In the first
+round, the first chunk of the data is used as the testing set and the remaining
+two chunks are used for training. In the next round, the second (middle) chunk
+of the data is used as the testing set and the remaining two chunks are used for
+training. And in the third and final round, the third (last) chunk of the data
+is used as the testing set and the other two chunks are used for training. In
+each of these rounds (assuming we are doing binary classification), we could extract 
+the metrics 5 metrics reviewed above (overall accuracy, sensitivity, specificity,
+precision, and negative predictive value). We could also look at average peformance
+on these 5 metrics across the k rounds.
 
 ![](./pics/kuhn_p71_kfold.PNG)
 
 ## Repeated training/testing splits
 
+Another way of conducting k round of training and testing is by employing a
+training-testing strategy alternatively referred to as repeated training/testing
+splits, "leave-group-out crossvalidation", or or "Monte Carlo cross-validation"
+(Kuhn & Johnson, 2013, p.71). This is very similar k-fold cross validation,
+except we randomly generate our training and testing sets for each of our k
+training and testing rounds. In each round, we pick a portion of our data'that
+we want to be in training set and a portion of our data that we want to be in
+our testing set (e.g. 90% training, 10% testing). In each round, we then randomly 
+sample rows without replacement to determine which rows will be in our training
+set and which will be in our testing set. As with k-fold cross validation, these
+means that, in any given round, a row will never appear in both our training
+and testing set. However, unlike k-fold cross validation, this does allow that
+across different training and testing rounds, a row that appeared in a testing
+set in one round may appear again in the testing set used in another round.
+Again, this is depicted schematically by Kuhn & Johnson (2013, p.72) in the figure
+below. Using the same hypothetical dataset of 12 rows, they show how 3 rounds of
+repeated training/testing split would proceed. In each round, the portion of the
+dataset used for training is 66.6% (i.e. 8/12), with the remaining data used in
+the testing set. However, these are now determined by random sampling without
+replacement--and thus datapoints can reappear in testing sets (e.g. we see
+spiky green circle in the testing set in both rounds 2 and 3).
+
 ![](./pics/kuhn_p72_repeated.PNG)
 
 ## Bootstrapping
 
-In bootstrapping we build our training and testing sets by sampling 
+The final major data splitting strategy is bootstrapping. It is almost exactly like the
+"Monte Carlo cross-validation" reviewed just above, except that in each training-testing
+round, rows are sampled *with* replacement. Bootstrapping is often used in cases where the dataset does not
+contain that many observations. In these cases, methods like k-fold cross validation
+or "Monte Carlo cross-validation", limit the amount of data that can be used for training
+because the dataset is always split up, with only some portion of the full dataset going
+into the training set. With bootstrapping, in each round of training and testing,
+some portion of the observations are selected to create the training set and the other
+portion is used to create the testing set. However, observations are sampled
+with replacement both to create the training set and the testing set. Thus, the
+same observation might appear multiple times in the training set or multiple
+times in the training set. This allows us to build larger training sets that we might
+otherwise be able to. And indeed with bootstrapping, the rows selected for the training
+set are resampled with replacement until the training set is the same size as the original
+dataset (Kuhn & Johnson, 2013, p.72).
+
+This process is depicted  below in the figure from Kuhn & Johnson (2013, p.73). Again,
+we have 3 rounds of training and testing. In each round, we construct the training
+set by sampling with replacement from a subset of the rows of the full dataset. 
+The rows which were not resampled from are used for the training set. Thus, as we
+can see, we can construct testing sets that are of the same size as the full dataset,
+even as the testing
+set remains some portion of the size of the full dataset (e.g. around 33% here).
+As we can also see, this results in the same datapoint not only appearing in test
+sets between rounds (e.g. blue spiky ball appears in test set in both round 1 and
+round 2), but also the same datapoint reappearing multiple times within one
+trainig set (e.g. the green square appear twice in the training set in the first
+round).
 
 ![](./pics/kuhn_p73_bootstrap.PNG)
 
 ## Procedure For Our Models
 
-To assess the models I create here, I will keep constant the method of data splitting.
-And I plat to use repeated training/testing splits. Specifically, for each model,
-I will randomly split the dataset into equal halves (50-50 split), allocating one half
-for training and the other half for testing. For each model type (e.g. logistic regression),
-I will do this ten times, and the average performance across these 10 models will be recorded. 
-This will consitute the official performance of that model type. 
+When I evaluate various models that I will create in later sections, I will keep 
+the method of data splitting constant. Specifically, I will always used a repeated 
+training/testing splits ("Monte Carlo cross-validation"). To assess overall performance,
+I will conduct 10 rounds of testing and training. In each round, the dataset will be
+split exactly in half (i.e. 50-50 split). Using random sampling without replacement,
+one half of the dataset will be used for the training set and the other half will
+be used for the testing set. For final model evaluation, the average performance across 
+these 10 models will be recorded. And this will consitute the official performance
+of that model type. 
 
 I prefer this technique for a few reasons. First, we have a fairly large amount of
-data (5,004 rows). So we don't have to worry about trying to use as much of our data
-as possible for training (we have enough data to spare). Although bootstrapping is
-a perfectly legitimate technique for data splitting, I don't like how it leaves open the
-possibility that the same observation may wind up in both the training and test set.
-Further, bootstrapping is particularly useful in cases where data is limited (e.g.
-fewer number of observations), which is not the case here. That leaves a choice
-between k-fold cross validation and repeated testing/training splits. 
-
-
-
+data (5,004 rows). So we have enough data to "spare" that we don't *have to* use
+bootstrapping if we don't want to. Even though bootstrapping is a perfectly legitimate
+technique for data splitting, I'd like to avoid using the same observation multiple
+times if we can in the training set if. That leaves a choice between k-fold cross 
+validation and repeated testing/training splits ("Monte Carlo cross-validation").
+I choose the latter strategy because
+I'd like to allocate exactly equal amounts of data to the training set and the
+testing set. With k-fold cross validation this is only possible if we conduct
+2-fold cross validation (with 2 chunks, and 2 rounds of training and testing).
+With "Monte Carlo cross-validation", we can conduct arbitrarily many rounds of
+training-testing, with a 50-50 split each time -- because in each round, we are
+sampling from the full dataset anew (rather than re-arranging the same sets of
+chunks across rounds).
 
 # Citations
 
