@@ -13,10 +13,10 @@ In this section, we will generate our second hybrid human-computer model.
 This will be a support vector machine model. The general training-testing and
 model building procedure will be exactly the same as for our earlier
 [support vector machine model](./hld_MODEL_logistic.html), with the exception
-of course that our hybrid model will also take into account human predictions
-as a feature (in addition to the textual features used earlier). The performance
-of this model will be compared to the performance of a non-hybrid model (which uses
-only textual features) trained on the same statements.
+that our hybrid model will also take into account human predictions
+as a feature. The performance of this model will be compared to the performance 
+of a non-hybrid model (which uses only textual features) trained on the same
+statements.
 
 # Packages
 
@@ -34,7 +34,7 @@ library(kernlab) # has sigest, for selecting tuning parameter sigma
 
 Next, I will load the data file, we created [earlier](./hld_HMODEL_overview.html),
 which has both the cleaned and processed textual features and human predictions.
-Note, again, that these data files consists of a total of 3,663 statments.
+Note, again, that this data file consists of a total of 3,663 statments.
 
 ```{r}
 # load df of combined human and processed textual feature and ground truth
@@ -42,11 +42,9 @@ load("stats_combo.Rda")
 
 # For rendering, I'm going to cheat here and load results created when this model was first run
 # For some reason, chunks that were supposed to be cached when originally run are rerunning
-# load("results_HYB_svm.Rda")
+load("results_HYB_svm.Rda")
 # change the specific names (renamed at end), back to generic name
-# results_HYB_svm -> results
-# model_hybrid_svm -> model_hybrid
-# model_non_hybrid_svm -> model_non_hybrid
+results_HYB_svm -> results
 
 ```
 
@@ -67,10 +65,9 @@ As usual, let's begin with a singular example. Here we will simply train and tes
 two support vector machine models: one hybrid model that takes into accounts
 both human predictions and textual features and one that only takes into
 account textual features. As with our original support vector machine models,
-we will use radial basis kernel functions, to take advantage of SVMs ability 
-to produce non-linear classification boundaries (see discussion in final
-introductory paragraphs of earlier 
-[SVM page, right above "Packages" section](./hld_MODEL_logistic.html),
+we will use a radial basis kernel function, to take advantage of SVMs ability 
+to produce non-linear classification boundaries (see final introductory paragraphs
+of earlier [SVM page, right above "Packages" section](./hld_MODEL_logistic.html),
 for some more discussion).
 
 ## Split Sample Into Training and Testing Sets
@@ -79,8 +76,8 @@ As before, we are going to conduct an exact 50-50 split,
 randomly allocating one half of the statements to the training set, and
 the other half to the testing set (using the createDataPartition function in the 
 caret packages; Kuhn, 2008; Kuhn, 2019). The exact same training set will be
-used to build the hybrid and non-hybrid models, both of which will then also be tested
-on the exact same testing set.
+used to build the hybrid and non-hybrid models, both of which will then also be 
+tested on the exact same testing set.
 
 ```{r, cache = FALSE}
 # set seed, so that statistics don't keep changing for every analysis
@@ -105,18 +102,26 @@ test_set_ex <- stats_combo[-index_train_ex, ]
 
 Now that the data are split, we can fit support vector machine models to the training
 data. Again, we will fit two support vector machine models. One, a hybrid model that uses
-both textual features and human guesses as predictors. An the other, a non-hybrid
+both textual features and human guesses as predictors; the other, a non-hybrid
 model that uses on textual features as predictors. 
 
 As with our earlier support vector machine models, and unlike with our logistic
-regression models, this model has two tuning parameters that we need to set:
+regression models, this type of model has two tuning parameters that we need to set:
 our cost penalty and our sigma parameter in the radial basis function. As before,
 I will set the sigma parameter using the slightly modified recommendations from the
 sigest function in the kernlab package. And as before, I will select a cost penalty
 by cycling through the candidate values of 0.25, 0.5, 1, 2, and 4, and selecting
 the value that leads to the highest level of overall accuracy across 3 repeated
-50-50 training testing splits (see "Build Model (on Training Set)" section of earlier
-[SVM page](./hld_MODEL_logistic.html) for more detailed discussion).
+50-50 training testing splits within the training set (see "Build Model (on Training Set)"
+section of earlier [SVM page](./hld_MODEL_logistic.html) for more detailed discussion).
+
+When we go through this process, we end up with two trained models with the 
+following (highly similar) tuning parameter values:
+
+| Model Type    | Sigma | Cost Penalty |
+| ------------- | ----- | ------------ |
+| Non-Hybrid    | 0.0057 | 4 |
+| Hybrid    | 0.0055 | 4 |
 
 
 ```{r svm_tune_params}
@@ -223,45 +228,29 @@ model_hybrid
 
 ## Evaluate Model (on Testing Set)
 
-Finally, let's examine and compare the performance of the two models. As before,
-this is done by using the models to generate predictions on the remaining ~50%
-of the data (1831 statements) in the training set. And then examining the performance
-statistics using the confusionMatrix function from the caret package (Kuhn, 2008).
+Now, let's examine and compare the performance of the two models. As before,
+we will do this by using the models to generate predictions on the remaining ~50%
+of the data (1831 statements) in the training set. Performance statistics 
+are derived using the confusionMatrix function from the caret package (Kuhn, 2008).
 
-Both models have an overall accuracy level that is above chance:
+When we do this, we see that both models have an overall accuracy level that is a
+again above chance:
 
 * hybrid model: 64.1% [95% CI: 61.9, 66.3%]
-* non-hybrid model: 63.2% [95% CI: 60.9, 65.4%]
+* non-hybrid model: 63.5% [95% CI: 61.2, 65.7%]
 
-And the overall accuracy of the hybrid model is better than the overall accuracy
-of the non-hybrid model. Dissapointingly, however, this difference is not 
-significant, chi-squared = 0.30, p = 0.583. Not even close in fact. This is both
-dissapointing and surprising. [Earlier](./hld_HUMAN_perf.html), we saw that human 
-predictions alone achieved an accuracy of over 55%, which was well above chance.
-And a model trained only on textual features here does well above chance as well
-(overall accuracy > 63%, as seen just above). It would stand to reason that adding
-in human predictions would serve to significantly improve the model. This is of
-course not what happened. I will need to conduct further analyses to examine why this
-is. One possible hypothesis at the moment is that (1) human predictions are 
-somehow redundant with some existing feature or set of features. (Note: this is not to
-say that such a feature or set of features is the actual basis of human judgments,
-just that there might be, for whatever reason, an assocation). However, a priori,
-this seems unlikely to me, knowing the features we have extracted (i.e. it seems
-unlikely to me that human judgments are going to track something as clinical as
-the number of pronouns in a sentence, or even more "human" features like sentiment).
-Another hypothesis relates to (2) the different pattern of guessing by which
-humans and computer models achieve their accuracy. As we saw in our previous 
-analyses, computer models had roughly comparable levels of sensitivity (rate of 
-truth detection) and specificity (rate of lie detection). However, humans had
-much higher sensitivity than specificity. I am not sure of the exact effect of
-this on the hybrid models, but a loose speculation might be that any gains in
-accuracy that might come from adding in human predictions would come from
-correctly identifying a larger portion of truths as truths, however, these would
-be "offset" by increasing the portion of lies that are incorrectly identified.
+Further, as with [analysis of hybrid and non-hybrid logistic regression models](./hld_MODEL_logistic.html),
+the overall accuracy of the hybrid model is better than the overall accuracy
+of the non-hybrid model. But again, dissapointingly, this difference is not 
+significant, chi-squared = 0.14, p = 0.705. (Again, see the 
+["Evaluate Model (on Testing Set)" section](./hld_MODEL_logistic.html) of the
+hybrid logistic regression analyses for some discussion and speculation about
+possible reasons for this outcome.)
 
-With regard to other performance metrics, I have not yet conducted formal statistical
-for each of theme, but sensitivity, specificity, precision, and negative predictive
-value look roughly the same between the hybrid and non-hyrbid models.
+As before, with regard to other performance metrics, I have not yet conducted formal
+statistical for each of theme, but sensitivity, specificity, precision, and negative 
+predictive value look roughly the same between the hybrid and non-hyrbid models,
+hovering around 63% for all.
 
 ```{r, cache = FALSE}
 # generate predictions for hybrid model 
@@ -324,7 +313,6 @@ non_hybrid_total = sum(conf_non_hybrid$table)
 
 ```
 
-
 ```{r}
 # conduct actual test
 prop.test(x = c(hybrid_total_correct, non_hybrid_total_correct),
@@ -339,63 +327,69 @@ prop.test(x = c(hybrid_total_correct, non_hybrid_total_correct),
 # function to compute z-value
 # from: https://www.r-bloggers.com/comparison-of-two-proportions-parametric-z-test-and-non-parametric-chi-squared-methods/
 z.prop = function(x1,x2,n1,n2){
+  # compute z-value 
   numerator = (x1/n1) - (x2/n2)
   p.common = (x1+x2) / (n1+n2)
   denominator = sqrt(p.common * (1-p.common) * (1/n1 + 1/n2))
   z.prop.ris = numerator / denominator
-  return(z.prop.ris)
+  
+  # compute p-value
+  p_value <- 2*pnorm(-abs(z.prop.ris))
+  
+  # combine results in string vector
+  test_result <- c(paste("z=", round(z.prop.ris, 3),
+                         ", p=", round(p_value, 3),
+                         sep = ""))
+  
+  # return z and p-value
+  return(test_result)
 }
 
-# actual z prop (z = 0.58)
-z_value <-
-  z.prop(x1 = hybrid_total_correct,
+# get actual two proportion z-test results
+z.prop(x1 = hybrid_total_correct,
          x2 = non_hybrid_total_correct,
          n1 = hybrid_total, 
          n2 = non_hybrid_total)
 
-# get corresponding p-value (two-sided) (p = 0.559)
-p_value <- 2*pnorm(-abs(z_value))
-
-# print z and p
-print(paste("z=", round(z_value, 3),
-            ", p=", round(p_value, 3),
-            sep = ""))
 ```
 
 
-# Change in predictions
+## Change in predictions
 
-Let's try to get some insight into how the incorporating human predictions
+As we did before, let's try to get some insight into how the incorporating human predictions
 changed the predictions made by the hybrid model (as compared to the predictions
-made by the non-hybrid model). As we have discussed [before](./hld_MODEL_overview.html),
-there are only four possibile outcomes when the predictions of a model are compared
-to reality: true positive, true negative, false positive, false negative.
-All of the model's performance depends on these four quantities. We can
-think of the non-hybrid model as a "baseline", upon which the hybrid model might
-improve. The only way the hybrid model might improve upon the non-hybrid model
-is through one of two ways: a statment that was incorrectly predicted as a false negative
-by the non-hybrid model is correctly predicted as a true positive by the hybrid model,
-or a statement that was incorrectly predicted as a false positive by the non-hybrid
-model is correctly predicted as a tur negative by the hybrid model. The rest of the 
-changes either have no effect (a true positive stays a true positive from the non-hybrid
-to a hybrid model, a true negative stays a true negative, a false positive stays a 
-false positive, or a false negative stays a false negative) or are detrimental 
-(a true positive becomes a false negative, or a true negative becomes a false
-positive).
+made by the non-hybrid model).
 
-Below, I have tabulated the total number of times these eight possible changes
-have occurred, when the non-hybrid model's predictions are compared to the
-hybrid model's predictions. What we see is that most of the predictions stayed
-the same
-between the non-hybrid and hybrid model (1698 of 1831 predictions, 92.7%, were the
+To do this, I have tabulated the total number of times each of the eight possible 
+changes in predictions have occurred, when the non-hybrid model's predictions are 
+compared to the hybrid model's predictions. As a reminder, these eight possible
+changes are:
+
+* nothing changes
+    + 1: non-hybrid prediction of true positive stays true positive prediction in hybrid model
+    + 2: true negative prediction in non-hybrid model stays true negative prediction in hybrid model
+    + 3: false positive prediction in non-hybrid model stays false positive prediction in hybrid model
+    + 4: false negative prediction in non-hybrid model stays false negative prediction in hybrid model
+* correct prediction changed to incorrect prediction
+    + 5: true positive prediction in non-hybrid model changes to false positive prediction in hybrid model
+    + 6: true negative prediction in non-hybrid model changes to false negative prediction in hybrid model
+* incorrect prediction changed to correct prediction
+    + 7: false positive prediction in non-hybrid model changes to true negative prediction in hybrid model
+    + 8: false negative prediction in non-hybrid model changes to true positive prediction in hybrid model
+
+(Again, see ["Change in predictions" section in earlier hybrid logistic regression analysis]((./hld_MODEL_logistic.html)
+for more detailed discussion of this analysis.)
+
+When do this, what we see is that again most of the predictions stayed the same
+between the non-hybrid and hybrid model (1697 of 1831 predictions, 92.7%, were the
 same). And only a slightly higher number of predictions went from incorrect 
-to correct (75 cases, 4.1%, were either false negative that become true positives
+to correct (73 cases, 4.0%, were either false negative that become true positives
 or false positives that become true negatives) than the number of predictions
-that went from correct to incorrect (58 cases, 3.2%, were either true positives
+that went from correct to incorrect (61 cases, 3.3%, were either true positives
 that become false negatives or true negatives that became false positives).
 
-More detailed analyses should examine how the human predictions relate to the
-other features used for prediction.
+More detailed analyses await with regard to the relationship between human prediction
+and the other (textual) features used for prediction.
 
 ```{r}
 # combine: grd_truth, non_hybrid predictions, hybrd predictions
@@ -452,14 +446,14 @@ preds_tally %>%
 
 # FULL (Hybrid and Non-Hybrid Logistic Regression Models)
 
-To get more reliable estimates of the performance of non-hybrid and hybrid models,
-let's repeat the exact model training and testing procedure from above 10 times,
-storing and aggregating the results.
+To get more reliable estimates of the performance of non-hybrid and hybrid support
+vector machine models, let's repeat the exact model training and testing procedure
+from above 10 times, storing and aggregating the results.
 
 ## Run 10 models
 
 Below is the code that runs through this modeling process 10 different times and
-saves the result from each round.
+saves the result from each round. 
 
 ```{r make_FULL_models, cache = TRUE, eval = FALSE}
 # # -----------------------------------------------------------------------------
@@ -511,18 +505,21 @@ for (i in 1:rounds){
   
   # part c: use caret "train" function to train hybrid and non-hybrid logistic regression model
   model_hybrid_i <- 
-  train(form = grd_truth ~ . - stat_id,
-        data = train_set_ex,
-        method = "glm",
-        family = "binomial")
+    train(form = grd_truth ~ . -stat_id,
+          data = train_set,
+          method = "svmRadial",
+          tuneGrid = tune_grid_hyb_svm,
+          trControl = train_control_svm,
+          metric = "Accuracy") # how to select among models
 
   model_non_hybrid_i <-
     train(form = grd_truth ~ . -stat_id -predict,
-          data = train_set_ex,
-          method = "glm",
-          family = "binomial")
-  
-  
+          data = train_set,
+          method = "svmRadial",
+          tuneGrid = tune_grid_non_hyb_svm,
+          trControl = train_control_svm,
+          metric = "Accuracy") # how to select among models
+    
   # part d: make predictions, using both hybrid and non-hybrid models
   preds_hyb_i <-
     predict(object = model_hybrid_i,
@@ -547,8 +544,8 @@ for (i in 1:rounds){
   
   # part f: store hybrid and non-hybrod model results
   # model type
-  results[2*i-1, 1] <- "logistic"
-  results[2*i, 1] <- "logistic"
+  results[2*i-1, 1] <- "svm"
+  results[2*i, 1] <- "svm"
   # hybrid o non-hybrid
   results[2*i-1, 2] <- "hybrid"
   results[2*i, 2] <- "non_hybrid"
@@ -606,28 +603,23 @@ for (i in 1:rounds){
 
 Directly below, I've displayed a raw tabular summary of the results. We have 20 rows,
 which result from the 2 models (hybrid and non-hybrid) created in each of 10
-rounds. One pattern that seems to stand out is that, although like before,
-the hybrid model only has a slightly higher overall accuracy than the hybrid
-model, this holds in every round. In the second chunk below, I have displayed this
-directly. For each round, I print the overall accuracy rate of the hybrid model
-next to the overall accuracy rate for the non-hybrid model. We see that in
-literally every single round, the hybrid model performed better than the
-non-hybrid model. This pattern of results seems unlikely to me, if the hybrid
-and non-hybrid models truly were equivalent in performance. Indeed, when I 
+rounds. One pattern worth examining again is how overall accuracy of the hybrid
+model compares with the overall accuracy of the non-hybrid model in each of the 
+the 10 rounds. We see that in 8 of the 10 rounds, the hybrid model has a 
+higher overall accuracy score than the non-hybrid model. However, when I 
 conduct a simple sign test, which uses a binomial distribution to examine
 how likely it is that one model should have a higher accuracy score than the other
-model for 10 out of 10 rounds, under the null assumption that each model
+model for 8 out of 10 rounds, under the null assumption that each model
 should have a higher accuracy score an equal number of times, this pattern
-diverges significanty from that null hypothesis, p = 0.002. Similarly,
+does not diverge significanty from that null hypothesis, p = 0.109. Similarly,
 when I conduct a Wilcoxon signed-rank test (which is non-parametric test which
 tests whether there is sufficient evidence to reject the null hypothesis that two
-*dependent* samples are drawn from the same population), this difference appears
-to be significant, V = 55, p = 0.006. This is some evidence to suggest that
-hybrid human-computer models can perform better than non-hybrid computer models,
-which do not incorporate human judgments. (There may be some statistical artifact or
-error that a more statistically savvy person may point out that I am failing to 
-account for, but I cannot think of one. Perhaps there is some form of non-independence
-that I have not accounted for.)
+*dependent* samples are drawn from the same population), this difference does 
+not appear to be significant, V = 39, p = 0.261. If this hybrid model dominance
+rate (80%) keeps up over a higher number of rounds (e.g. 100 rounds), then this
+might be some evidence to suggest that hybrid human-computer models perform better
+than non-hybrid computer models, which do not incorporate human judgments.
+As it stands, however, we shouldn't make too much of this result.
 
 
 ```{r}
@@ -654,7 +646,7 @@ results_acc_wide %>%
 
 ```{r}
 # sign test, via binomial test
-binom.test(x = 10,
+binom.test(x = 8,
            n = 10,
            p = 0.5)
 
@@ -670,12 +662,10 @@ wilcox.test(x = results_acc_wide$hybrid,
 
 ## View Results (Graphically; Overall Accuracy)
 
-When we visually examine the average overall accuracy rate of non-hybrid and hybrid 
-models across 10 rounds, we see much the same pattern of results we saw when compared
-these two model types only once in the example case with which we led. The hybrid 
-model has a slightly higher level of overall accuracy than the non-hybrid model
-(although, as we see the confidence intervals for the two models overall accuracy
-rates overlap).
+When we quickly visually examine the average overall accuracy rate of non-hybrid 
+and hybrid models across 10 rounds, we see that the hybrid model has a slightly 
+higher level of overall accuracy than the non-hybrid model (although, as we see
+the confidence intervals for the two models overall accuracy rates overlap).
 
 ```{r}
 # average n in test set for hybrid and non-hybrid models
@@ -797,25 +787,20 @@ results %>%
 
 ```
 
-
 # Save Results
 
 For now, this concludes our analysis. As our last step, lets save our results. 
 
 ```{r save, eval=FALSE}
 # rename results df, to be particular to this model type (for disambiguation later)
-results_HYB_log <- results
-model_hybrid_log <- model_hybrid
-model_non_hybrid_log <- model_non_hybrid
+results_HYB_svm <- results
 
 # clear results variable
 rm(results)
 
 # save results in Rda file
-save(results_HYB_log,
-     # model_hybrid_log,
-     # model_non_hybrid_log,
-     file = "results_HYB_log.Rda")
+save(results_HYB_svm,
+     file = "results_HYB_svm.Rda")
 ```
 
 
