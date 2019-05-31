@@ -12,7 +12,7 @@ output:
 In this section, we will generate our first hybrid human-computer model.
 This will be a logistic regression model. The general training-testing and
 model building procedure will be exactly the same as for our earlier
-(logistic regression model)[(./hld_MODEL_logistic.html)], with the exception
+[logistic regression model](./hld_MODEL_logistic.html), with the exception
 of course that our hybrid model will also take into account human predictions
 as a feature (in addition to the textual features used earlier). The performance
 of this model will be compared to the performance of a non-hybrid model (which uses
@@ -96,7 +96,7 @@ test_set_ex <- stats_combo[-index_train_ex, ]
 
 Now that the data are split, we can fit the logistic regression models to the training
 data. Again, we will fit two logistic regression models. One, a hybrid model that uses
-both textual features and human guesses as predictors. An the other, a non-hybrid
+both textual features and human guesses as predictors. And the other, a non-hybrid
 model that uses on textual features as predictors. These two models are fit to the
 training data below.
 
@@ -268,7 +268,7 @@ print(paste("z=", round(z_value, 3),
 ```
 
 
-# Change in predictions
+## Change in predictions
 
 Let's try to get some insight into how the incorporating human predictions
 changed the predictions made by the hybrid model (as compared to the predictions
@@ -417,13 +417,13 @@ for (i in 1:rounds){
   # part c: use caret "train" function to train hybrid and non-hybrid logistic regression model
   model_hybrid_i <- 
   train(form = grd_truth ~ . - stat_id,
-        data = train_set_ex,
+        data = train_set,
         method = "glm",
         family = "binomial")
 
   model_non_hybrid_i <-
     train(form = grd_truth ~ . -stat_id -predict,
-          data = train_set_ex,
+          data = train_set,
           method = "glm",
           family = "binomial")
   
@@ -527,7 +527,7 @@ diverges significanty from that null hypothesis, p = 0.002. Similarly,
 when I conduct a Wilcoxon signed-rank test (which is non-parametric test which
 tests whether there is sufficient evidence to reject the null hypothesis that two
 *dependent* samples are drawn from the same population), this difference appears
-to be significant, V = 55, p = 0.006. This is some evidence to suggest that
+to be significant, V = 55, p = 0.002. This is some evidence to suggest that
 hybrid human-computer models can perform better than non-hybrid computer models,
 which do not incorporate human judgments. (There may be some statistical artifact or
 error that a more statistically savvy person may point out that I am failing to 
@@ -710,16 +710,12 @@ For now, this concludes our analysis. As our last step, lets save our results.
 ```{r save, eval=FALSE}
 # rename results df, to be particular to this model type (for disambiguation later)
 results_HYB_log <- results
-model_hybrid_log <- model_hybrid
-model_non_hybrid_log <- model_non_hybrid
 
 # clear results variable
 rm(results)
 
 # save results in Rda file
 save(results_HYB_log,
-     # model_hybrid_log,
-     # model_non_hybrid_log,
      file = "results_HYB_log.Rda")
 ```
 

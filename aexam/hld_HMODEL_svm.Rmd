@@ -603,10 +603,10 @@ for (i in 1:rounds){
 
 Directly below, I've displayed a raw tabular summary of the results. We have 20 rows,
 which result from the 2 models (hybrid and non-hybrid) created in each of 10
-rounds. One pattern worth examining again is how overall accuracy of the hybrid
-model compares with the overall accuracy of the non-hybrid model in each of the 
-the 10 rounds. We see that in 8 of the 10 rounds, the hybrid model has a 
-higher overall accuracy score than the non-hybrid model. However, when I 
+rounds. One pattern that is again immediately apparent is how overall accuracy of 
+the hybrid model compares with the overall accuracy of the non-hybrid model in 
+each of the the 10 rounds. We see that in 8 of the 10 rounds, the hybrid model has
+a higher overall accuracy score than the non-hybrid model. However, when I 
 conduct a simple sign test, which uses a binomial distribution to examine
 how likely it is that one model should have a higher accuracy score than the other
 model for 8 out of 10 rounds, under the null assumption that each model
@@ -615,11 +615,13 @@ does not diverge significanty from that null hypothesis, p = 0.109. Similarly,
 when I conduct a Wilcoxon signed-rank test (which is non-parametric test which
 tests whether there is sufficient evidence to reject the null hypothesis that two
 *dependent* samples are drawn from the same population), this difference does 
-not appear to be significant, V = 39, p = 0.261. If this hybrid model dominance
-rate (80%) keeps up over a higher number of rounds (e.g. 100 rounds), then this
-might be some evidence to suggest that hybrid human-computer models perform better
-than non-hybrid computer models, which do not incorporate human judgments.
-As it stands, however, we shouldn't make too much of this result.
+not appear to be significant, V = 39, p = 0.261. Although these results are not
+statistically significant, if this hybrid model dominance rate (80%) keeps up over
+a higher number of rounds (e.g. 100 rounds), then this would provide some supporting
+evidence that hybrid human-computer models perform better than non-hybrid computer 
+models. This pattern of results is also consistent with the pattern we saw in the 
+hybrid logistic regression analyses ["View Results (Tabular)" section](./hld_HMODEL_logistic.html),
+where the hybrid model outperformed the non-hybrid model in each of the 10 rounds.
 
 
 ```{r}

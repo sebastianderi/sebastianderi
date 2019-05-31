@@ -1,5 +1,5 @@
 ---
-title: "Hybrid Performance"
+title: "Hybrid Performance (Overview & Preliminaries)"
 author: Sebastian Deri
 output:
   html_document:
@@ -9,9 +9,47 @@ output:
 
 [return to [overview page](./hld_OVERVIEW.html)]
 
+In this final series of analyses, I will create hybrid human-computer models
+to make truth-lie predictions. These models will be almost exactly like the
+computer models we created earlier (i.e. [here](./hld_MODEL_logistic.html), 
+[here](./hld_MODEL_svm.html), and [here](./hld_MODEL_neural.html)). These
+models will use the textual features we extracted and cleaned earlier (i.e. 
+[statement length](./hld_FEATURE_length.html), [parts of speech](./hld_FEATURE_pos.html),
+[sentiment](./hld_FEATURE_sent.html), [readability & complexity](./hld_FEATURE_complex.html),
+[bag of words](./hld_FEATURE_words.html), which we then [cleaned](./hld_CLEAN.html)).
+However, these news models will include one more feature: human predictions. As 
+we [saw](./hld_HUMAN_perf.html), humans were able to perform above chance when 
+making predictions about the truth or falsity of statements in our corpus (55.5% 
+accuracy across 3663 statements). Thus, the hope is that feeding these human predictions
+into a computer model as an additional feature that they may take into account 
+(in addition to textual features) will further improve their accuracy. The
+expectations is that these hybrid human-computer models should perform better
+(have higher overall accuracy) than either purely text-based computer models
+and pure human prediction.
+
+In the sections that follow, I will create hybrid models of the same three types
+as earlier: logistic regression, support vector machine, and neural network.
+In each case, these hybrid human-computer models will then be compared to computer 
+models trained solely on textual features. (We will use the same training test
+splits as earlier, i.e. 50-50 training-testing split, repeated 10 times. Note,
+however, that we only have human predictions for 3,663 of the full 5,004 statements.
+Thus, our hybrid models will be restricted to this set of 3,663 statements for 
+which both textual features and human predictions are available. As we saw in the
+"OTHER ANALYSES" section of our [logistic regression model](./hld_MODEL_logistic.html),
+model performance increased as a model had more data to train on. Thus, it would
+not exactly be an equivalent comparison to examine the performance of the hybrid
+models trained on 50% of 3,663 statements relative to earlier non-hybrid computer 
+models we created which were trained on 50% of the full 5,004 statements. Thus, 
+the hybrid models will be compared to new non-hybrid models trained on 50% of 
+the same 3,663 statements.)
+
+In the remainder of this page, I just go through some basic preliminary steps
+needed to eventually build these hybrid human-computer models (namely, combining
+the textual features with human predictions into one nice tidy data file).
+
 # Packages
 
-Again, I will start by loading relevant packages.
+As usual, I will start by loading relevant packages.
 
 ```{r, message=FALSE, warning=FALSE}
 # before knitting: message = FALSE, warning = FALSE
@@ -21,8 +59,9 @@ library(tidyverse) # cleaning and visualization
 
 # Load Data
 
-First, I will load the various cleaned versions of the data we just
-created.
+Next, I will load in the two basic data file we need: the processed textual features
+for each of the 5,004 statements and human predictions that were made for 3,663 of
+the statements.
 
 ```{r}
 # load in cleaned features
@@ -34,13 +73,22 @@ load("stats_guess.Rda")
 
 ```
 
+# Join File Together
+
+And here, I will join those files together, and then print the resultant
+data frame.
+
 ```{r}
 # combine data
 stats_combo <-
   stats_guess %>%
   select(stat_id, predict) %>%
   left_join(y = stats_proc,
-            by = "stat_id")
+            by = "stat_id") %>%
+  select(stat_id,
+         grd_truth,
+         predict,
+         everything())
 
 # print resultant df
 stats_combo
@@ -48,6 +96,8 @@ stats_combo
 ```
 
 # Save Results
+
+And finally, let's save the combined data file that we just created.
 
 ```{r save, eval = FALSE}
 # save combined file in Rda file
