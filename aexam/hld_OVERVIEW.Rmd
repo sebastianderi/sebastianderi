@@ -31,7 +31,7 @@ other sequentially.
 * [Hybrid Human-Computer Model Prediction](./hld_HMODEL_overview.html)
     + [Logistic Regression Hybrid Model](./hld_HMODEL_logistic.html)
     + [Support Vector Machine Hybrid Model](./hld_HMODEL_svm.html)
-    + [Neural Network Hybrid Model](/.hld_HMODEL_neural.html)
+    + [Neural Network Hybrid Model](./hld_HMODEL_neural.html)
     + [Comparison of All Hybrid Models](./hld_HMODEL_comparison.html)
 * [Final Summary](./hld_SUMMARY.html)
 
