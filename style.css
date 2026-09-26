@@ -3,7 +3,7 @@ body {
 }
 
 div  {
-	margin-left: 25%;
+	margin-left: 10%;
 	/*margin-right: 25*/;
 	margin-top: 30 px;
     	width: 800px /*500px*/;
@@ -66,8 +66,13 @@ p {
 
 li {
 	font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+	font-size: 14px;
+	font-style: normal;
+	font-variant: normal;
+	font-weight: 400;
+	line-height: 20px;
+	text-align: left;
 	color: white;
-	text-align:left;
 }
 
 blockquote {
