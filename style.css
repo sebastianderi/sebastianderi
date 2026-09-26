@@ -2,7 +2,17 @@ body {
 	background-color: black;
 }
 
-div  {
+div {
+	max-width: 600px;
+	width: 90%;
+	margin-left: auto;
+	margin-right: auto;
+	margin-top: 30px;
+	text-align: left;
+	color: white;
+}
+
+/* div  {
 	margin-left: 10%;
 	margin-right: 10%;
 	/*margin-right: 25*/;
@@ -13,12 +23,12 @@ div  {
 	color: white;
 
 	/* border: 3px solid white; */
-}
+} */
 
-div #top_div {
+/* div #top_div {
 	margin-top: 5%;
 	text-align: center;
-}
+} */
 
 h1 {
 	font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
